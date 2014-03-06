@@ -1,3 +1,7 @@
+# notes
+*.txt
+
+#Python
 *.py[cod]
 
 # C extensions
