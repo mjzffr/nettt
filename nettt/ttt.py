@@ -168,18 +168,15 @@ class TicTacToeGame:
     # TODO: testing
     @staticmethod
     def grid_to_list(grid):
-        return [i for row in grid for grid in row]
+        return [i for row in grid for i in row]
 
     # TODO: testing
-    @staticmethod
-    def to_srepr(grid):
-        srepr = ','.join([str(i) for row in grid for grid in row])
-        size = self.SIZE
-        # replace a comma with a colon after each size * 2 steps to signify
-        # the end of a grid row
-        for i in range(size * 2, size ** 2 * 2, size * 2):
-            srepr = srepr[:i] + ';' + srepr[i+1:]
-        return srepr
+    def to_srepr(self, grid):
+        rowstrs = [','.join([str(i) for i in row]) for row in grid]
+        # format howto: {} is replaced by item of l
+        return ('{};' * (self.SIZE - 1) +'{}').format(*rowstrs)
+
+
 
     # assuming game loop is implemented by UI
     def play(self):
