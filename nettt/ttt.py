@@ -140,6 +140,7 @@ class TicTacToeGame:
         #otherwise
         self.mode = GSTATES['INPROGRESS']
 
+    # TODO: testing
     @staticmethod
     def is_winning_line(line):
         ''' return true if line consists of all 'X' or 'O';
@@ -154,18 +155,22 @@ class TicTacToeGame:
     __X
 
     '''
+    # TODO: testing
     @staticmethod
     def str_to_grid(stringrep):
         return [map(int,i.split(',')) for i in stringrep.split(';')]
 
+    # TODO: testing
     @staticmethod
     def str_to_list(stringrep):
         return TicTacToeGame.grid_to_list(Board.string_to_grid(stringrep))
 
+    # TODO: testing
     @staticmethod
     def grid_to_list(grid):
         return [i for row in grid for grid in row]
 
+    # TODO: testing
     @staticmethod
     def to_srepr(grid):
         srepr = ','.join([str(i) for row in grid for grid in row])
@@ -196,60 +201,3 @@ class TicTacToeGame:
             boardstr += '\n'
         return boardstr
 
-
-''' Terrible testing '''
-def test_mode():
-    game = TicTacToeGame(initial_state=[[0,0,0],[0,0,0],[0,0,0]])
-    print game
-    game.update_mode()
-    print game.mode
-    print game.lastwincoords
-    print
-    game = TicTacToeGame(initial_state=[[1,1,-1],[-1,1,1],[1,-1,-1]])
-    print game
-    game.update_mode()
-    print game.mode
-    print game.lastwincoords
-    print
-    game = TicTacToeGame(initial_state=[[1,0,0],[0,1,0],[0,1,0]])
-    print game
-    game.update_mode()
-    print game.mode
-    print game.lastwincoords
-    print
-    game = TicTacToeGame(initial_state=[[1,0,0],[0,1,0],[0,0,1]])
-    print game
-    game.update_mode()
-    print game.mode
-    print game.lastwincoords
-    print
-    game = TicTacToeGame(initial_state=[[-1,0,0],[-1,1,0],[-1,0,1]])
-    print game
-    game.update_mode()
-    print game.mode
-    print game.lastwincoords
-    print
-    game = TicTacToeGame(initial_state=[[-1,-1,-1],[1,1,0],[1,0,1]])
-    print game
-    game.update_mode()
-    print game.mode
-    print game.lastwincoords
-    print
-    game = TicTacToeGame(initial_state=[[1,0,1],[-1,1,0],[1,0,-1]])
-    print game
-    game.update_mode()
-    print game.mode
-    print game.lastwincoords
-    print
-
-def test_moves(game):
-    game.update_mode()
-    print(game.make_move(1, (1,0)))
-    print(game.make_move(-1, (0,2)))
-    print(game.make_move(1, (0,1)))
-    print(game.make_move(-1, (1,2)))
-    print(game.make_move(1, (0,0)))
-    print(game.make_move(-1, (2,2)))
-
-if __name__ == "__main__":
-    print "hello"
