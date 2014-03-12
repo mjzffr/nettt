@@ -26,10 +26,13 @@ strreps = ['0,0,1;-1,1,1;-1,1,-1',
 
 state_rep = [dict(state=s, rep=r) for s,r in zip(shared.initstates,strreps)]
 sizes = [dict(testsize=s) for s in range(2,8)]
+dimensions = [dict(w=5, h=2)]
 # a map specifying multiple argument sets for a test method
 # Used by pytest_generate_tests
 params = { 'test_to_srepr': state_rep,
-            'test_diff_size_srepr': sizes }
+            'test_diff_size_srepr': sizes,
+            'test_str_to_grid': state_rep,
+            'test_to_srepr_fail': dimensions}
 
 def test_to_srepr(state, rep):
     assert ttt.TicTacToeGame.to_srepr(state) == rep
@@ -44,3 +47,12 @@ def test_diff_size_srepr(testsize):
     target = zeros[:s*2*(i)]+'-1'+zeros[s*2*(i)+1:]
 
     assert ttt.TicTacToeGame.to_srepr(state) == target
+
+def test_str_to_grid(state, rep):
+    assert ttt.TicTacToeGame.str_to_grid(rep) == state
+
+def test_to_srepr_fail(w, h):
+    notsquare = [[0]*w for i in range(h)]
+    with pytest.raises(ValueError):
+        ttt.TicTacToeGame.to_srepr(notsquare)
+

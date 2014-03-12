@@ -155,7 +155,7 @@ class TicTacToeGame:
     __X
 
     '''
-    # TODO: testing
+
     @staticmethod
     def str_to_grid(stringrep):
         return [map(int,i.split(',')) for i in stringrep.split(';')]
@@ -163,9 +163,8 @@ class TicTacToeGame:
     # TODO: testing
     @staticmethod
     def str_to_list(stringrep):
-        return TicTacToeGame.grid_to_list(Board.string_to_grid(stringrep))
+        return TicTacToeGame.grid_to_list(TicTacToeGame.str_to_grid(stringrep))
 
-    # TODO: testing
     @staticmethod
     def grid_to_list(grid):
         return [i for row in grid for i in row]
@@ -181,9 +180,7 @@ class TicTacToeGame:
 
     @staticmethod
     def is_square(grid):
-        dimensions = [len(i) for i in grid]
-        dimensions.append(len(grid))
-        return all(dimensions)
+        return all([len(grid) == len(i) for i in grid])
 
 
     # assuming game loop is implemented by UI
