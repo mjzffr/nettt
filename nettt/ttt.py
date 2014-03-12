@@ -170,12 +170,20 @@ class TicTacToeGame:
     def grid_to_list(grid):
         return [i for row in grid for i in row]
 
-    # TODO: testing
-    def to_srepr(self, grid):
+    @staticmethod
+    def to_srepr(grid):
+        if not TicTacToeGame.is_square(grid):
+            raise ValueError('The grid must be n x n')
+        size = len(grid)
         rowstrs = [','.join([str(i) for i in row]) for row in grid]
         # format howto: {} is replaced by item of l
-        return ('{};' * (self.SIZE - 1) +'{}').format(*rowstrs)
+        return ('{};' * (size - 1) +'{}').format(*rowstrs)
 
+    @staticmethod
+    def is_square(grid):
+        dimensions = [len(i) for i in grid]
+        dimensions.append(len(grid))
+        return all(dimensions)
 
 
     # assuming game loop is implemented by UI
