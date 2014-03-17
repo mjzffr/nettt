@@ -168,9 +168,8 @@ class TkTictactoe(ttk.Frame):
 
         raise Exception("Button not found!")
 
-
-# puts the Tktictactoe frame in main root window
-if __name__ == "__main__":
+def main():
+    # puts the Tktictactoe frame in main root window
     root = tk.Tk()
     # the window content should expand if the main window is resized
     root.grid_columnconfigure(0, weight=1)
@@ -180,6 +179,8 @@ if __name__ == "__main__":
     root.title("Tic Tac Toe!")
     root.mainloop()
 
+if __name__ == "__main__":
+    main()
 
 
 
