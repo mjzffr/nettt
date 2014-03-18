@@ -1,2 +1,2 @@
-import nettt_gui
-nettt_gui.main()
+import txtclient
+txtclient.main()
