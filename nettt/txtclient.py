@@ -124,7 +124,10 @@ class TUI(object):
             # if game in progress send forfeit, else do nothing
             pass
         elif cmd.startswith('m'):
-            pass
+            try:
+                self.process_move(cmd)
+            except ValueError as e:
+                print '\rInvalid command. Try h for help. -- ', e
         else:
             print 'INVALID COMMAND'
             print helpmsg
@@ -138,6 +141,15 @@ class TUI(object):
         while True:
             self.print_view()
             self.parse_input(sys.stdin.readline().strip())
+
+    def process_move(self, cmd):
+        # cmd is of the form 'm 5 6'
+        if not cmd.startswith('m ') or cmd.count(' ') != 2:
+            raise ValueError
+
+        row, col = tuple([int(i) for i in cmd[2:].split()])
+        self.tempgame.make_move(1, (row,col))
+
 
     def print_view(self):
          # connection status - Connected. You are X
