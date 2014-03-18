@@ -57,7 +57,6 @@ def test_single_move_coord(game):
     game.make_move(-1, (2, 0))
     assert game.board == [[0, 0, 0], [0, 0, 0], [-1, 0, 0]]
 
-
 def test_game_over(done_game):
     with pytest.raises(Exception):
         done_game.make_move(1, (0,2))

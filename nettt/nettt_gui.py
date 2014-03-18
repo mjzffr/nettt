@@ -45,7 +45,8 @@ class TkTictactoe(ttk.Frame):
         self.rowconfigure(2, weight=1)
         self.place_widgets()
 
-        self.connect()
+        self.client = c.TTTClient()
+
 
 
     def place_widgets(self):
@@ -83,19 +84,20 @@ class TkTictactoe(ttk.Frame):
 
     def connect(self):
         # connect button
-        # TODO: register with client
-        self.client = c.TTTClient()
-
+        self.connlbl['text'] = CONNMSGS['connect']
+        self.client.connect()
         if self.client.connected:
-             self.conn_btn['fg'] = 'black'
-             pass
+            self.conn_btn['fg'] = 'black'
+            self.connlbl['text'] = CONNMSGS['waiting']
+            # schedule a call to "establish connection" after 1 sec
+            self.after(1000, self.client.establish_session)
         else:
             self.conn_btn['fg'] = 'red'
+            self.connlbl['text'] = CONNMSGS['failed']
 
-            # the user of this UI. ASSUMPTIONS: user is always P1 and P1 is
-            # always the first player
+
+            #TODO
             # self.THISPLAYER = ??? #TODO: THISPLAYER should actually belong to client
-        # turn green if initial connection failed
 
     def quit(self):
         self.client.end_session()
@@ -175,6 +177,9 @@ def main():
     root.grid_columnconfigure(0, weight=1)
     root.grid_rowconfigure(0, weight=1)
     gameframe = TkTictactoe(master = root)
+
+    # things to do on startup but after the window is drawn
+    gameframe.connect()
 
     root.title("Tic Tac Toe!")
     root.mainloop()

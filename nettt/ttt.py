@@ -7,10 +7,9 @@ GSTATES = {'INPROGRESS':4, 'NOTSTARTED':3, 'P2WON':BSTATES['P2'],
 
 class TicTacToeGame:
 
-    def __init__(self, size = 3, initial_state = None):
+    def __init__(self, size=3, initial_state=None):
         self.SIZE = size
-        self.board = [[BSTATES['EMPTY'] for i in range(self.SIZE)] \
-                       for i in range(self.SIZE)]
+        self.board = [[BSTATES['EMPTY']] * self.SIZE for _ in range(self.SIZE)]
 
         self.current_player = BSTATES['P1']
         self.mode = GSTATES['NOTSTARTED']
@@ -23,6 +22,21 @@ class TicTacToeGame:
         # for testing
         if initial_state:
             self.board = initial_state
+
+    @property
+    def board_1d(self):
+        return [i for row in self.board for i in row]
+
+    @property
+    def boardstr(self):
+        # more general than necessary (from before this was a property)
+        if not TicTacToeGame.is_square(self.board):
+            raise ValueError('The grid must be n x n')
+        size = len(self.board)
+
+        rowstrs = [','.join([str(i) for i in row]) for row in self.board]
+        # format howto: {} is replaced by item of l
+        return ('{};' * (size - 1) +'{}').format(*rowstrs)
 
     def make_random_move(self, player):
         ''' player is 1 or -1 (for X or O)
@@ -56,15 +70,13 @@ class TicTacToeGame:
         self.current_player = BSTATES['P1']
         self.mode = GSTATES['NOTSTARTED']
 
-    def make_move(self, player, location):
+    def make_move(self, player, (row, col)):
         ''' player is 1 or -1 (for X or O)
-            location is tuple of row,col coords
             returns location that was changed
         '''
         if self.is_over():
             raise Exception("No game in progress. Game over.")
 
-        (row, col) = location
         # validate
         size = self.SIZE
         if player != self.current_player:
@@ -72,7 +84,7 @@ class TicTacToeGame:
                     str(self.current_player))
             raise ValueError(msg)
         if row not in range(size) or col not in range(size):
-            raise ValueError("Invalid location value " + str(location))
+            raise ValueError("Invalid location value " + str((row, col)))
 
         # update state
         if self.board[row][col] == BSTATES['EMPTY']:
@@ -83,11 +95,11 @@ class TicTacToeGame:
                 # only switch turns if most recent move did not end the game
                 self.current_player *= -1
         else:
-            raise ValueError("Location already full " + str(location))
+            raise ValueError("Location already full " + str((row, col)))
         print self
         print
 
-        return location
+        return (row, col)
 
     def update_points(self):
         if self.mode == GSTATES['P1WON']:
@@ -97,28 +109,27 @@ class TicTacToeGame:
             self.wins[BSTATES['P2']] += 1
             self.losses[BSTATES['P1']] += 1
 
-    def update_mode_helper(self, winner, line):
-        self.mode = winner
-        self.lastwincoords = set(line)
-        self.update_points()
-
     def update_mode(self):
         ''' determines whether game is over '''
         s = self.SIZE
-        board_1d = [i for row in self.board for i in row]
 
         # don't check until one player has made > SIZE moves
-        if board_1d.count(BSTATES['EMPTY']) > s ** 2 - (s * 2 - 1):
+        if self.board_1d.count(BSTATES['EMPTY']) > s ** 2 - (s * 2 - 1):
             self.mode = GSTATES['INPROGRESS']
             return
 
+        def update_mode_helper(line):
+            self.mode = self.board[line[0][0]][line[0][1]]
+            self.lastwincoords = set(line)
+            self.update_points()
+
         for ri,row in enumerate(self.board):
             if TicTacToeGame.is_winning_line(row):
-                self.update_mode_helper(row[0], [(ri,i) for i in range(s)])
+                update_mode_helper([(ri,i) for i in range(s)])
                 return
         for ci,col in enumerate(zip(*self.board)):
             if TicTacToeGame.is_winning_line(col):
-                self.update_mode_helper(col[0], [(i,ci) for i in range(s)])
+                update_mode_helper([(i,ci) for i in range(s)])
                 return
 
         diagonal_coords = [[(i,i) for i in range(s)],
@@ -128,11 +139,11 @@ class TicTacToeGame:
 
         for i,l in enumerate(diagonals):
             if TicTacToeGame.is_winning_line(l):
-                self.update_mode_helper(l[0], diagonal_coords[i])
+                update_mode_helper(diagonal_coords[i])
                 return
 
         #it's a draw
-        if BSTATES['EMPTY'] not in board_1d:
+        if BSTATES['EMPTY'] not in self.board_1d:
             self.mode = GSTATES['DRAW']
             self.lastwincoords = set()
             return
@@ -160,23 +171,9 @@ class TicTacToeGame:
     def str_to_grid(stringrep):
         return [map(int,i.split(',')) for i in stringrep.split(';')]
 
-    # TODO: testing
     @staticmethod
     def str_to_list(stringrep):
         return TicTacToeGame.grid_to_list(TicTacToeGame.str_to_grid(stringrep))
-
-    @staticmethod
-    def grid_to_list(grid):
-        return [i for row in grid for i in row]
-
-    @staticmethod
-    def to_srepr(grid):
-        if not TicTacToeGame.is_square(grid):
-            raise ValueError('The grid must be n x n')
-        size = len(grid)
-        rowstrs = [','.join([str(i) for i in row]) for row in grid]
-        # format howto: {} is replaced by item of l
-        return ('{};' * (size - 1) +'{}').format(*rowstrs)
 
     @staticmethod
     def is_square(grid):

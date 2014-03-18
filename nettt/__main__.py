@@ -1,2 +1,2 @@
-import nettt_ui
-nettt_ui.main()
+import nettt_gui
+nettt_gui.main()
