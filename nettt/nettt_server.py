@@ -17,14 +17,16 @@ formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - ' +
 handler.setFormatter(formatter)
 logger.addHandler(handler)
 
+
 class Session:
     ''' Keeps track of game and its two participating clients.'''
     def __init__(self, firstclient):
         self.player1 = firstclient
         self.player2 = None
         self.game = ttt.TicTacToeGame()
-        # queue of messages?
 
+    # For now, if a player leaves a gamesession, that gamesession is concluded
+    # and his partner is automatically put in a new empty gamesession.
 
 class Server:
     def __init__(self):
@@ -35,6 +37,7 @@ class Server:
         self.sessions = []
         # which clients belong to which games
         self.sessiondict = {}
+        # a queue of messages?
 
 
     def run(self):
@@ -63,30 +66,18 @@ class Server:
                     for iolist in [self.readables, self.writables,
                                    self.allsockets]:
                         iolist.append(clientsock)
-                    # assuming that the accept() call was successful
-                    clientsock.send("Hello to " + str(clientaddr) + '\n')
-                    # TODO if there are any unpaired sessions, add the client to one
-                    # TODO how to keep track of which client is in which session?
-                    # otherwise create a new lonely session for this client
-                    # assumption: a client can be in only one session
-                    #gamesession = Session(clientsock)
-                    #self.sessiondict[clientsock] = gamesession
-                    #self.sessions.append(Session(clientsock))
+                    logger.info('Connected to ' + str(clientaddr))
+                    #self.assign_to_session(clientsock)
                 elif r is sys.stdin:
                     if (sys.stdin.readline()).strip() == 'exit':
-                        # (?): assume that client is responsible for closing
-                        # its connection
-                        self.listenersock.close()
+                        listenersock.close()
                         print "Server off"
-                        quit()
+                        sys.exit()
                 # collect a message from each ready client
                 else:
-                    pass
-                    #self.broadcast_msg(r, ready_wrs)
+                    # TODO
+                    print r.recv(1024)
 
-            # disconnect from any other errorful clients
-            # (One "normally" leaves the error list in select empty
-            # according to http://docs.python.org/3/howto/sockets.html)
             for s in exceptional:
                 for iolist in [self.readables, self.writables,
                                self.allsockets]:
@@ -94,29 +85,50 @@ class Server:
                         iolist.remove(s)
                 s.close()
 
-    def broadcast_msg(self, source, destinations):
-        ''' Send message from source to all other clients in destinations list.
-        `destinations` is the result of a select call: if a client wasn't ready
-        at that moment, it will never receive this message!
-        '''
-        msg = source.recv(SIZE)
-        if msg:
-            for recipient in destinations:
-                if recipient is not source:
-                    try:
-                        recipient.send(msg)
-                    except socket.error as e:
-                        # remote peer disconnected
-                        if isinstance(e.args, tuple) and e[0] == errno.EPIPE:
-                            self.disconnect_client(recipient)
-                        else:
-                            # some other unanticipated issue. :(
-                            raise e
+    # @property
+    # def num_sessions(self):
+    #     return len(set(self.sessiondict.values()))
+
+
+
+
+    def assign_to_session(client):
+        if len(self.sessions) != 0 and not self.sessions[-1].player2:
+            # add client to last-created session; it is unpaired
+            self.sessiondict[clientsock] = self.sessions[-1]
+            self.sessions[-1].player2 = clientsock
+            # send message to client that it is p1 and it's p2's turn
         else:
-            # no data received means that source has disconnected
-            self.disconnect_client(source)
+            gamesession = Session(clientsock)
+            # TODO send message to client that it is p1 and it's p1's turn
+            self.sessiondict[clientsock] = gamesession
+            self.sessions.append(gamesession)
+
+
+    # def broadcast_msg(self, source, destinations):
+    #     ''' Send message from source to all other clients in destinations list.
+    #     `destinations` is the result of a select call: if a client wasn't ready
+    #     at that moment, it will never receive this message!
+    #     '''
+    #     msg = source.recv(SIZE)
+    #     if msg:
+    #         for recipient in destinations:
+    #             if recipient is not source:
+    #                 try:
+    #                     recipient.send(msg)
+    #                 except socket.error as e:
+    #                     # remote peer disconnected
+    #                     if isinstance(e.args, tuple) and e[0] == errno.EPIPE:
+    #                         self.disconnect_client(recipient)
+    #                     else:
+    #                         # some other unanticipated issue. :(
+    #                         raise e
+    #     else:
+    #         # no data received means that source has disconnected
+    #         self.disconnect_client(source)
 
     def disconnect_client(self, s):
+        # TODO discard session that the client belonged to
         print "Disconnecting: " + str(s.getpeername())
         if s in self.writables:
             self.writables.remove(s)
