@@ -2,11 +2,21 @@ import ttt
 import socket
 import errno
 import sys
+import logging
 
 HOST = 'localhost'
 PORT = 50000
 GSTATES = ttt.GSTATES
 BSTATES = ttt.BSTATES
+
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
+handler = logging.FileHandler('client.log')
+handler.setLevel(logging.INFO)
+formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - ' +
+                              '%(message)s')
+handler.setFormatter(formatter)
+logger.addHandler(handler)
 
 
 # initalize game after connection?
@@ -33,22 +43,23 @@ class TTTClient(object):
         # value with after every time local player makes a move?
 
     def connect(self, attempts=10):
+        #TODO improve logging clarity
         if self.connected:
             return
 
         for i in range(attempts):
-            print 'Attempt', i,
+            logger.info('Attempt ' + str(i))
             try:
                 self.s.connect((HOST,PORT))
                 self.connected = True
                 break
             except socket.timeout as e:
-                print 'Socket Timeout', e
+                logger.info('Socket Timeout ' + str(e))
             except socket.gaierror as e:
-                print 'Socket gaierror', e
+                logger.info('Socket gaierror' + str(e))
             except socket.error as e:
                 if isinstance(e.args,tuple) and e[0] == errno.EISCONN:
-                   print 'Already connected'
+                   logger.info('Already connected')
                    self.connected = True
                    break
                 TTTClient.raise_surprise(e,[errno.ECONNABORTED,
@@ -59,7 +70,7 @@ class TTTClient(object):
         ''' Propagates exception e if it doesn't match any errcodes '''
         if isinstance(e.args,tuple) and any([e[0] == c for c in errcodes]):
             # we were expecting this one
-            print e
+            logger.info(str(e))
         else:
             # surprise!
             raise e
@@ -67,7 +78,7 @@ class TTTClient(object):
 
     def establish_session(self):
         #while not self.partner:
-        print 'establish'
+        logger.info('establish')
         self.partner = self.s.recv(8)
             #self.role = self.s.recv(8)
 
@@ -119,7 +130,7 @@ class TUI(object):
         elif cmd == 'q':
             self.quit()
         elif cmd == 'c':
-            client.reset_connection()
+            self.client.connect()
         elif cmd == 'n':
             # if game in progress send forfeit, else do nothing
             pass
@@ -167,6 +178,7 @@ class TUI(object):
 
 def main():
     TUI().play()
+
 
 if __name__ == '__main__':
     main()
