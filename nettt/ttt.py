@@ -90,14 +90,14 @@ class TicTacToeGame:
         if self.board[row][col] == BSTATES['EMPTY']:
             self.board[row][col] = player
             self.update_mode()
-            print self.mode
+            #print self.mode
             if self.mode == GSTATES['INPROGRESS']:
                 # only switch turns if most recent move did not end the game
                 self.current_player *= -1
         else:
             raise ValueError("Location already full " + str((row, col)))
-        print self
-        print
+        #print self
+        #print
 
         return (row, col)
 
