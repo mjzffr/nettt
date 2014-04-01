@@ -45,15 +45,18 @@ class TicTacToeGame:
         if self.is_over():
             raise Exception("No game in progress. Game over.")
 
-        location = random.choice(self.get_locations(BSTATES['EMPTY']))
+        location = random.choice(self.get_locations(self.board, BSTATES['EMPTY']))
         return self.make_move(player, location)
 
-    def get_locations(self, bstate):
-        ''' returns list of (row, col) tuples '''
-        board = self.board
+
+    @staticmethod
+    def get_locations(board, bstate):
+        ''' returns list of (row, col) tuples at which the board state is
+         bstate '''
         return [(ri,ci) for ri,row in
                 enumerate(board) for ci,spot in
                 enumerate(row) if spot == bstate]
+
 
     def is_over(self):
         #print "Check %s" % self.mode
