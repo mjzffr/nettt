@@ -46,7 +46,7 @@ class TkTictactoe(ttk.Frame):
         self.place_widgets()
 
         self.client = c.TTTClient()
-
+        self.connect()
 
 
     def place_widgets(self):
@@ -89,12 +89,9 @@ class TkTictactoe(ttk.Frame):
         if self.client.connected:
             self.conn_btn['fg'] = 'black'
             self.connlbl['text'] = CONNMSGS['waiting']
-            # schedule a call to "establish connection" after 1 sec
-            self.after(1000, self.client.establish_session)
         else:
             self.conn_btn['fg'] = 'red'
             self.connlbl['text'] = CONNMSGS['failed']
-
 
             #TODO
             # self.THISPLAYER = ??? #TODO: THISPLAYER should actually belong to client
@@ -170,22 +167,18 @@ class TkTictactoe(ttk.Frame):
 
         raise Exception("Button not found!")
 
-def main():
-    # puts the Tktictactoe frame in main root window
+
+# puts the Tktictactoe frame in main root window
+if __name__ == "__main__":
     root = tk.Tk()
     # the window content should expand if the main window is resized
     root.grid_columnconfigure(0, weight=1)
     root.grid_rowconfigure(0, weight=1)
     gameframe = TkTictactoe(master = root)
 
-    # things to do on startup but after the window is drawn
-    gameframe.connect()
-
     root.title("Tic Tac Toe!")
     root.mainloop()
 
-if __name__ == "__main__":
-    main()
 
 
 

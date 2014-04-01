@@ -55,10 +55,9 @@ class TTTClient:
 
     def establish_session(self):
         #while not self.partner:
-        print 'establish'
-        self.partner = self.s.recv(8)
-            #self.role = self.s.recv(8)
-
+            #self.partner = fromserver
+            #self.role = fromserver
+            pass
 
     def send_move(self):
         pass
