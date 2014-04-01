@@ -104,7 +104,7 @@ class TicTacToeGame:
 
         return (row, col)
 
-    def update_points(self):
+    def update_score(self):
         if self.mode == GSTATES['P1WON']:
             self.wins[BSTATES['P1']] += 1
             self.losses[BSTATES['P2']] += 1
@@ -112,47 +112,24 @@ class TicTacToeGame:
             self.wins[BSTATES['P2']] += 1
             self.losses[BSTATES['P1']] += 1
 
+
     def update_mode(self):
-        ''' determines whether game is over '''
-        s = self.SIZE
+            ''' determines whether game is over '''
+            s = self.SIZE
 
-        # don't check until one player has made > SIZE moves
-        if self.board_1d.count(BSTATES['EMPTY']) > s ** 2 - (s * 2 - 1):
-            self.mode = GSTATES['INPROGRESS']
-            return
-
-        def update_mode_helper(line):
-            self.mode = self.board[line[0][0]][line[0][1]]
-            self.lastwincoords = set(line)
-            self.update_points()
-
-        for ri,row in enumerate(self.board):
-            if TicTacToeGame.is_winning_line(row):
-                update_mode_helper([(ri,i) for i in range(s)])
-                return
-        for ci,col in enumerate(zip(*self.board)):
-            if TicTacToeGame.is_winning_line(col):
-                update_mode_helper([(i,ci) for i in range(s)])
+            # don't check until one player has made > size moves
+            if self.board_1d.count(BSTATES['EMPTY']) > s ** 2 - (s * 2 - 1):
+                self.mode = GSTATES['INPROGRESS']
                 return
 
-        diagonal_coords = [[(i,i) for i in range(s)],
-            [(s-1-i, i) for i in range(s)]]
-        diagonals = [[self.board[i][i] for i in range(s)],
-            [self.board[s-1-i][i] for i in range(s)]]
+            self.mode, resultcoords = \
+                TicTacToeGame.decide_mode(self.board)
+            self.ae()
 
-        for i,l in enumerate(diagonals):
-            if TicTacToeGame.is_winning_line(l):
-                update_mode_helper(diagonal_coords[i])
-                return
+            # <= 2 means draw, xwon or owon
+            if self.mode <= 2:
+                self.lastwincoords = resultcoords
 
-        #it's a draw
-        if BSTATES['EMPTY'] not in self.board_1d:
-            self.mode = GSTATES['DRAW']
-            self.lastwincoords = set()
-            return
-
-        #otherwise
-        self.mode = GSTATES['INPROGRESS']
 
     # TODO: testing
     @staticmethod
@@ -161,6 +138,38 @@ class TicTacToeGame:
         line is a list of board spaces, like a row or a diagonal'''
         return BSTATES['EMPTY'] not in line and all(line[0] == i for i in \
                                                       line)
+
+    @staticmethod
+    def decide_mode(board):
+        ''' return pair of gstate and set of winning line coords if there is one
+        Assuming board is square!'''
+        s = len(board)
+
+        for ri,rowvals in enumerate(board):
+            if TicTacToeGame.is_winning_line(rowvals):
+                return (rowvals[0], set([(ri,i) for i in range(s)]))
+        for ci,colvals in enumerate(zip(*board)):
+            if TicTacToeGame.is_winning_line(colvals):
+                return (colvals[0], set([(i,ci) for i in range(s)]))
+
+        diagonal_coords = [[(i,i) for i in range(s)],
+            [(s - 1 - i, i) for i in range(s)]]
+        diagonals = [[board[i][i] for i in range(s)],
+            [board[s - 1 - i][i] for i in range(s)]]
+
+        for i,diagvals in enumerate(diagonals):
+            if TicTacToeGame.is_winning_line(diagvals):
+                return (diagvals[0], set(diagonal_coords[i]))
+
+        #it's a draw
+        board_1d = [i for row in board for i in row]
+        if BSTATES['EMPTY'] not in board_1d:
+            return (GSTATES['DRAW'], set())
+
+        #otherwise
+        return (GSTATES['INPROGRESS'], set())
+
+
 
     ''' Helper funcions for compact string representation of game board
 
