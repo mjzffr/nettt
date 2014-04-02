@@ -84,6 +84,9 @@ class TTTClient(object):
         # send type of session (ai or person)
         # expect partner and/or "your turn" in response
         self.sock.send(self.session_type)
+
+
+    def temp_recv_test(self):
         response = self.sock.recv(2) # TODO might raise socket.error!
         if response:
             print "yay" + response
@@ -116,12 +119,12 @@ class TUI(object):
     PLAYER_LABELS = {BSTATES['P1']:'X',
                      BSTATES['P2']:'O',
                      BSTATES['EMPTY']:'_'}
-    CONNMSGS = {'connect':'Connecting...',
-                'waiting': 'Connected. Awaiting partner.',
-                'insession': 'Connected. You are',
-                'failed': 'Connection failed.'}
-    TURNMSGS = {'partner': "Partner's turn.",
-                'you': 'Your turn.'}
+    CONNMSGS = {'connect':'\rConnecting...',
+                'waiting': '\rConnected. Awaiting partner.',
+                'insession': '\rConnected. You are',
+                'failed': '\rConnection failed.'}
+    TURNMSGS = {'partner': "\rPartner's turn.",
+                'you': '\rYour turn.'}
     HELPMSG = ('\nh - help\n'
                'q - quit\n'
                'm - make move with row col, e.g. m 0 2 is top-right\n'
@@ -172,10 +175,11 @@ class TUI(object):
             program.
             Returns true if successful, false otherwise
         '''
+        self.CONNMSGS['connect'],
         self.client.connect()
         # retry
         while not self.client.connected:
-            print self.CONNMSGS['failed']
+            print self.CONNMSGS['failed'],
             choice = None
             while choice not in ('y','n'):
                 print 'Try again? (y/n) ',
@@ -184,10 +188,11 @@ class TUI(object):
                 self.client.connect()
             else:
                 return False
-        print self.CONNMSGS['waiting']
+        print self.CONNMSGS['waiting'],
         # TODO, respond to whether this worked
-        #self.allow_interrupt(self.client.establish_session())
         self.client.establish_session()
+        self.allow_interrupt(self.client.temp_recv_test)
+        print self.CONNMSGS['insession'],
         return True
 
     def playing_loop(self):
@@ -211,7 +216,7 @@ class TUI(object):
     def print_view(self):
         # connection status - Connected. You are X
         if self.client.connected:
-            print '\r', self.CONNMSGS['insession']
+            #print '\r', self.CONNMSGS['insession']
             # stats/score
             print 'Won, Lost: ', str((0,0))
             print 'Session Type: ', self.client.session_type
@@ -225,19 +230,25 @@ class TUI(object):
             print '\r', self.CONNMSGS['failed']
         print self.PROMPT,
 
-    def allow_interrupt(self, commfunc):
+    def allow_interrupt(self, readingfunc):
         ''' Allow user to quit while we keep trying a function that
-            depends on communicating with server, e.g. give up
+            depends on response from server, e.g. give up
             after waiting for a long time for a response'''
         # Note, join_session is implemented differently because we want
         # the client to try one and then always give the user to try
         # again or give up.
-        to_read = [client.sock, sys.stdin]
+        to_read = [self.client.sock, sys.stdin]
+        i = 0
         while True:
+            i += 1
             ready, _, _ = select.select(to_read, [],[], 60)
             for stream in ready:
-                if stream is client.sock:
-                    commfunc()
+                print '\r',str(i),
+                if stream is self.client.sock:
+                    # reading func is responsible for reading everything
+                    # it needs in one shot so we can return?
+                    readingfunc()
+                    return
                 elif sys.stdin.readline().strip() == 'q':
                     self.quit()
 

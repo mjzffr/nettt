@@ -4,7 +4,7 @@ import ttt
 import logging
 import sys
 import select
-#import time
+import time
 
 HOST = 'localhost'
 PORT = 50000
@@ -87,10 +87,10 @@ class Server:
                     # has crashed
                     # When client closes socket, empty string is received
                     message = r.recv(8)
-                    #time.sleep(10)
                     if not message:
                         self.delete_socket(r)
                     else: # TEMP, TODO
+                        time.sleep(5)
                         _, ready_to_write, _ = select.select([],[r],[],1)
                         if ready_to_write:
                             ready_to_write[0].send('hello')
