@@ -4,6 +4,7 @@ import ttt
 import logging
 import sys
 import select
+#import time
 
 HOST = 'localhost'
 PORT = 50000
@@ -25,7 +26,8 @@ class Session:
         self.player2 = None
         self.game = ttt.TicTacToeGame()
 
-    # For now, if a player leaves a gamesession, that gamesession is concluded
+    # For now, if a player leaves a gamesession, that gamesession is
+    # concluded
     # and his partner is automatically put in a new empty gamesession.
 
 class Server:
@@ -38,12 +40,13 @@ class Server:
         # which clients belong to which games
         self.sessiondict = {}
         # a queue of messages?
-
+        # dictionary of sock : reuqests, dictionary  sock: responses?
 
     def run(self):
         listenersock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         #prevent the "already in use error"
         listenersock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        listenersock.setblocking(False)
         # TODO: bind raises an exception if port is already in use
         listenersock.bind((HOST, PORT))
         listenersock.listen(5)
@@ -55,7 +58,8 @@ class Server:
         while True:
             # wait for at least one of the sockets to be ready
             (ready_rds, ready_wrs,
-                exceptional) = select.select(self.readables, self.writables,
+                exceptional) = select.select(self.readables,
+                                             self.writables,
                                              self.allsockets, 60)
 
             # Process incoming data
@@ -63,6 +67,7 @@ class Server:
                 # accept a client connection
                 if r is listenersock:
                     clientsock, clientaddr = listenersock.accept()
+                    clientsock.setblocking(False)
                     for iolist in [self.readables, self.writables,
                                    self.allsockets]:
                         iolist.append(clientsock)
@@ -75,15 +80,37 @@ class Server:
                         sys.exit()
                 # collect a message from each ready client
                 else:
+                    print 'client recv'
+                    print (ready_rds, ready_wrs, exceptional)
                     # TODO
-                    print r.recv(1024)
+                    # results in err104 connection reset by peer if client
+                    # has crashed
+                    # When client closes socket, empty string is received
+                    message = r.recv(8)
+                    #time.sleep(10)
+                    if not message:
+                        self.delete_socket(r)
+                    else: # TEMP, TODO
+                        _, ready_to_write, _ = select.select([],[r],[],1)
+                        if ready_to_write:
+                            ready_to_write[0].send('hello')
+                            ready_to_write[0].send('hello')
 
-            for s in exceptional:
-                for iolist in [self.readables, self.writables,
-                               self.allsockets]:
-                    if s in iolist:
-                        iolist.remove(s)
-                s.close()
+            # for w in ready_wrs:
+            #     print 'client send'
+            #     print (ready_rds, ready_wrs, exceptional)
+            #     w.send('hello')
+
+            for e in exceptional:
+                self.delete_socket(e)
+
+    def delete_socket(self, sock):
+        for iolist in [self.readables, self.writables, self.allsockets]:
+            if sock in iolist:
+                iolist.remove(sock)
+        sock.close()
+        print 'closed socket'
+                #logger.info('Closed a socket.')
 
     # @property
     # def num_sessions(self):

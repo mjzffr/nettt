@@ -3,12 +3,14 @@ import socket
 import errno
 import sys
 import logging
+import select
 
 HOST = 'localhost'
 PORT = 50000
 GSTATES = ttt.GSTATES
 BSTATES = ttt.BSTATES
 
+# general log setup
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 handler = logging.FileHandler('client.log')
@@ -28,157 +30,224 @@ logger.addHandler(handler)
 
 class TTTClient(object):
     def __init__(self):
-        self.s = None
+        self.sock = None
+        self.session_type = 'a'
         self.reset_connection()
 
+
     def reset_connection(self):
-        ''' Called at beginning and when peer disconnects. '''
-        if self.s:
-            self.s.close()
-        self.s = socket.socket()
-        self.s.settimeout(30)
+        ''' Called in __init__ and when peer disconnects. '''
+        if self.sock:
+            self.disconnect()
+        self.sock = socket.socket()
         self.connected = False
-        self.partner = None
+        #self.partner = None
+        # (p)erson or (a)i
         # TODO how will GUI know that self.connected is False? Poll for
         # value with after every time local player makes a move?
 
-    def connect(self, attempts=10):
-        #TODO improve logging clarity
+    def connect(self):
         if self.connected:
             return
 
-        for i in range(attempts):
-            logger.info('Attempt ' + str(i))
-            try:
-                self.s.connect((HOST,PORT))
-                self.connected = True
-                break
-            except socket.timeout as e:
-                logger.info('Socket Timeout ' + str(e))
-            except socket.gaierror as e:
-                logger.info('Socket gaierror' + str(e))
-            except socket.error as e:
-                if isinstance(e.args,tuple) and e[0] == errno.EISCONN:
-                   logger.info('Already connected')
-                   self.connected = True
-                   break
-                TTTClient.raise_surprise(e,[errno.ECONNABORTED,
-                                           errno.ECONNREFUSED])
+        def raise_surprise(e, errcodes):
+            ''' Propagates exception e if it doesn't match any errcodes '''
+            if isinstance(e.args,tuple) and any([e[0] == c for c in errcodes]):
+                # we were expecting this one
+                logger.info(str(e))
+            else:
+                # surprise!
+                raise e
 
-    @staticmethod
-    def raise_surprise(e, errcodes):
-        ''' Propagates exception e if it doesn't match any errcodes '''
-        if isinstance(e.args,tuple) and any([e[0] == c for c in errcodes]):
-            # we were expecting this one
-            logger.info(str(e))
-        else:
-            # surprise!
-            raise e
+        #TODO improve logging clarity
+        try:
+            self.sock.connect((HOST,PORT))
+            self.connected = True
+            #self.sock.setblocking(False)
+        # except socket.timeout as e:
+        #     logger.info('Socket Timeout ' + str(e))
+        except socket.gaierror as e:
+            logger.info('Socket gaierror' + str(e))
+        except socket.error as e:
+            if isinstance(e.args,tuple) and e[0] == errno.EISCONN:
+               logger.info('Already connected')
+               self.connected = True
+            raise_surprise(e,[errno.ECONNABORTED,
+                                       errno.ECONNREFUSED])
+
 
 
     def establish_session(self):
+        ''' Asks server for a game and a partner '''
         #while not self.partner:
         logger.info('establish')
-        self.partner = self.s.recv(8)
-            #self.role = self.s.recv(8)
+        # send type of session (ai or person)
+        # expect partner and/or "your turn" in response
+        self.sock.send(self.session_type)
+        response = self.sock.recv(2) # TODO might raise socket.error!
+        if response:
+            print "yay" + response
+        else:
+            self.connected = False
 
-    def ask_status(self):
+            #self.role = self.sock.recv(8)
+
+    def request_status(self): #I don't remember what this is for :(
         pass
 
-    def send_move(self):
+    def request_move(self):
         pass
 
-    def send_newgame(self):
+    def request_newgame(self):
         pass
 
-    def end_session(self):
+    def disconnect(self):
         if self.connected:
-            self.s.close()
+            # in case we haven't recv'd everything server sent
+            self.sock.shutdown(socket.SHUT_RDWR)
+            self.sock.close()
         self.connected = False
-        pass
 
     def recv_update(self):
+        ''' get board state and stats from server'''
         pass
 
 class TUI(object):
     PLAYER_LABELS = {BSTATES['P1']:'X',
                      BSTATES['P2']:'O',
                      BSTATES['EMPTY']:'_'}
-
-
     CONNMSGS = {'connect':'Connecting...',
                 'waiting': 'Connected. Awaiting partner.',
                 'insession': 'Connected. You are',
                 'failed': 'Connection failed.'}
-
     TURNMSGS = {'partner': "Partner's turn.",
                 'you': 'Your turn.'}
+    HELPMSG = ('\nh - help\n'
+               'q - quit\n'
+               'm - make move with row col, e.g. m 0 2 is top-right\n'
+               'n - new game with same opponent\n')
+    PROMPT = '\r>> '
 
     def __init__(self):
         self.client = TTTClient()
+        # TODO: for early testing
         self.tempgame = ttt.TicTacToeGame()
 
-    def parse_input(self, rawcmd):
-        helpmsg = ('\nh - help\n'
-                   'q - quit\n'
-                   'c - reconnect to server\n'
-                   'm - make move with xcoord ycoord, e.g. m 0 0 is top-left\n'
-                   'n - new game\n')
+    def parse_playinput(self, rawcmd):
+        ''' responds to commands '''
         cmd = rawcmd.strip().lower()
         if cmd == 'h':
-            print helpmsg
+            print self.HELPMSG
         elif cmd == 'q':
             self.quit()
-        elif cmd == 'c':
-            self.client.connect()
         elif cmd == 'n':
             # if game in progress send forfeit, else do nothing
             pass
         elif cmd.startswith('m'):
             try:
-                self.process_move(cmd)
+                self.parse_move(cmd)
             except ValueError as e:
                 print '\rInvalid command. Try h for help. -- ', e
         else:
             print 'INVALID COMMAND'
-            print helpmsg
+            print self.HELPMSG
 
     def quit(self):
-        self.client.end_session()
+        self.client.disconnect()
         print '\rGoodbye'
         sys.exit()
 
-    def play(self):
+    def parse_sessiontype(self):
+        ''' User can choose between playing another person or playing
+            against ai
+        '''
+        choice = None
+        while choice not in ('a','p'):
+            print '\rPlay against (p)erson or (a)i? ',
+            choice = sys.stdin.readline().strip()
+            self.client.session_type = choice
+
+    def join_session(self):
+        ''' User can choose to try again to join or quit the
+            program.
+            Returns true if successful, false otherwise
+        '''
+        self.client.connect()
+        # retry
+        while not self.client.connected:
+            print self.CONNMSGS['failed']
+            choice = None
+            while choice not in ('y','n'):
+                print 'Try again? (y/n) ',
+                choice = sys.stdin.readline().strip()
+            if choice == 'y':
+                self.client.connect()
+            else:
+                return False
+        print self.CONNMSGS['waiting']
+        # TODO, respond to whether this worked
+        #self.allow_interrupt(self.client.establish_session())
+        self.client.establish_session()
+        return True
+
+    def playing_loop(self):
+        ''' This should be called after choose_session_type and
+            join_session have succeeded.
+        '''
+        print "Instructions: play tic tac toe. Here's how:"
+        print self.HELPMSG
         while True:
             self.print_view()
-            self.parse_input(sys.stdin.readline().strip())
+            self.parse_playinput(sys.stdin.readline().strip())
 
-    def process_move(self, cmd):
+    def parse_move(self, cmd):
         # cmd is of the form 'm 5 6'
         if not cmd.startswith('m ') or cmd.count(' ') != 2:
-            raise ValueError
-
+            raise ValueError("Move must be of the form 'm row col")
         row, col = tuple([int(i) for i in cmd[2:].split()])
+        # TODO: for early testing
         self.tempgame.make_move(1, (row,col))
 
-
     def print_view(self):
-         # connection status - Connected. You are X
-        print '\r', self.CONNMSGS['connect']
-        # stats/score
-        print 'Won, Lost: ', str((0,0))
-        # summary of opponent's move TODO
-        # turn - Your Turn TODO
-        # print self.TURNMSGS['you']
-        # board state
-        print self.tempgame
-        # prompt
-        print '>> ',
+        # connection status - Connected. You are X
+        if self.client.connected:
+            print '\r', self.CONNMSGS['insession']
+            # stats/score
+            print 'Won, Lost: ', str((0,0))
+            print 'Session Type: ', self.client.session_type
+            # summary of opponent's move TODO
+            # turn - Your Turn TODO
+            # print self.TURNMSGS['you']
+            # board state
+            # TODO: for early testing
+            print self.tempgame
+        else:
+            print '\r', self.CONNMSGS['failed']
+        print self.PROMPT,
+
+    def allow_interrupt(self, commfunc):
+        ''' Allow user to quit while we keep trying a function that
+            depends on communicating with server, e.g. give up
+            after waiting for a long time for a response'''
+        # Note, join_session is implemented differently because we want
+        # the client to try one and then always give the user to try
+        # again or give up.
+        to_read = [client.sock, sys.stdin]
+        while True:
+            ready, _, _ = select.select(to_read, [],[], 60)
+            for stream in ready:
+                if stream is client.sock:
+                    commfunc()
+                elif sys.stdin.readline().strip() == 'q':
+                    self.quit()
+
 
 
 def main():
-    TUI().play()
+    t = TUI()
+    t.parse_sessiontype()
+    if t.join_session():
+        t.playing_loop()
+    else:
+        t.quit()
 
-
-if __name__ == '__main__':
-    main()
