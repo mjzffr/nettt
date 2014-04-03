@@ -63,9 +63,7 @@ class TTTClient(object):
         try:
             self.sock.connect((HOST,PORT))
             self.connected = True
-            #self.sock.setblocking(False)
-        # except socket.timeout as e:
-        #     logger.info('Socket Timeout ' + str(e))
+            self.sock.setblocking(False)
         except socket.gaierror as e:
             logger.info('Socket gaierror' + str(e))
         except socket.error as e:
