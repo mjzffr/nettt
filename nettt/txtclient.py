@@ -40,7 +40,8 @@ class TTTClient(object):
         self.disconnect()
         self.sock = socket.socket()
         self.connected = False
-        #self.partner = None
+        self.turn = None
+        self.role = None
         # (p)erson or (a)i
         # TODO how will GUI know that self.connected is False? Poll for
         # value with after every time local player makes a move?
@@ -73,25 +74,28 @@ class TTTClient(object):
             raise_surprise(e,[errno.ECONNABORTED,
                                        errno.ECONNREFUSED])
 
-
-
-    def establish_session(self):
+    def request_session(self):
         ''' Asks server for a game and a partner '''
-        #while not self.partner:
-        logger.info('establish')
+        logger.info('Requested session type' + self.session_type)
         # send type of session (ai or person)
-        # expect partner and/or "your turn" in response
+        # expect your player id and turn-status in response
         self.sock.send(self.session_type)
 
-
-    def temp_recv_test(self):
-        response = self.sock.recv(2) # TODO might raise socket.error!
-        if response:
-            print "yay" + response
-        else:
-            self.connected = False
-
-            #self.role = self.sock.recv(8)
+    def await_partner(self):
+        ''' Expecting to receive string of the form 'xx,yy' where xx and yy
+        must be +1 or -1 and xx represents client's role and yy represents
+        whose turn it is.
+        '''
+        response = self.sock.recv(5)
+        logger.info('Response: ' + response)
+        errmsg = 'Protocol violated: ' + response
+        if len(response) != 5:
+            logger.info(errmsg)
+            raise Exception(errmsg)
+        self.role, self.turn = tuple([int(i) for i in response.split(',')])
+        if self.role not in [1, -1] or self.turn not in [1, -1]:
+            logger.info(errmsg)
+            raise Exception(errmsg)
 
     def request_status(self): #I don't remember what this is for :(
         pass
@@ -106,6 +110,8 @@ class TTTClient(object):
         if self.sock:
             if self.connected:
                 # in case we haven't recv'd everything server sent
+                # Note: socket.error: [Errno 107] Transport endpoint is
+                # not connected if server died a terrible death
                 self.sock.shutdown(socket.SHUT_RDWR)
             self.sock.close()
         self.connected = False
@@ -120,7 +126,7 @@ class TUI(object):
                      BSTATES['EMPTY']:'_'}
     CONNMSGS = {'connect':'\rConnecting...',
                 'waiting': '\rConnected. Awaiting partner.',
-                'insession': '\rConnected. You are',
+                'insession': '\rConnected. You are ',
                 'failed': '\rConnection failed.'}
     TURNMSGS = {'partner': "\rPartner's turn.",
                 'you': '\rYour turn.'}
@@ -177,6 +183,9 @@ class TUI(object):
             Returns true if successful, false otherwise
         '''
         self.CONNMSGS['connect'],
+        # allowing interrupt on connect isn't really useful in practice?
+        # maybe if lots of clients try to connect at the same time?
+        # I can't seem to reproduce that scenario :(
         self.allow_interrupt(self.client.connect, 'w')
         # retry
         while not self.client.connected:
@@ -190,9 +199,8 @@ class TUI(object):
             else:
                 return False
         print self.CONNMSGS['waiting'],
-        # TODO, respond to whether this worked
-        self.client.establish_session()
-        print self.CONNMSGS['insession'],
+        self.client.request_session()
+        self.allow_interrupt(self.client.await_partner, 'r')
         return True
 
     def playing_loop(self):
@@ -216,13 +224,15 @@ class TUI(object):
     def print_view(self):
         # connection status - Connected. You are X
         if self.client.connected:
-            #print '\r', self.CONNMSGS['insession']
+            print self.CONNMSGS['insession'], self.client.role
             # stats/score
             print 'Won, Lost: ', str((0,0))
             print 'Session Type: ', self.client.session_type
             # summary of opponent's move TODO
-            # turn - Your Turn TODO
-            # print self.TURNMSGS['you']
+            if self.client.turn == self.client.role:
+                print self.TURNMSGS['you']
+            else:
+                print self.TURNMSGS['partner']
             # board state
             # TODO: for early testing
             print self.tempgame
@@ -253,11 +263,14 @@ class TUI(object):
                 if stream is self.client.sock:
                     # reading func is responsible for reading everything
                     # it needs in one shot so we can return?
+                    print "before"
                     func()
+                    print "here"
                     return
                 elif sys.stdin.readline().strip() == 'q':
                     self.quit()
             for stream in readyw:
+                print "writer"
                 func()
                 return
 

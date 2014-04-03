@@ -4,7 +4,6 @@ import ttt
 import logging
 import sys
 import select
-import time
 
 HOST = 'localhost'
 PORT = 50000
@@ -49,6 +48,7 @@ class Server:
         listenersock.setblocking(False)
         # TODO: bind raises an exception if port is already in use
         listenersock.bind((HOST, PORT))
+
         listenersock.listen(5)
         print "Server on"
 
@@ -57,6 +57,8 @@ class Server:
 
         while True:
             # wait for at least one of the sockets to be ready
+            #import time
+            #time.sleep(10)
             (ready_rds, ready_wrs,
                 exceptional) = select.select(self.readables,
                                              self.writables,
@@ -90,6 +92,8 @@ class Server:
                     message = r.recv(8)
                     if not message:
                         self.delete_socket(r)
+                    else:
+                        print message
                     #else: # TEMP, TODO
                         # _, ready_to_write, _ = select.select([],[r],[],1)
                         # if ready_to_write:
