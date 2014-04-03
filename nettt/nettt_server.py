@@ -71,7 +71,8 @@ class Server:
                     for iolist in [self.readables, self.writables,
                                    self.allsockets]:
                         iolist.append(clientsock)
-                    logger.info('Connected to ' + str(clientaddr))
+                    print 'Connected to ' + str(clientaddr)
+                    #logger.info('Connected to ' + str(clientaddr))
                     #self.assign_to_session(clientsock)
                 elif r is sys.stdin:
                     if (sys.stdin.readline()).strip() == 'exit':
@@ -89,16 +90,17 @@ class Server:
                     message = r.recv(8)
                     if not message:
                         self.delete_socket(r)
-                    else: # TEMP, TODO
-                        time.sleep(5)
-                        _, ready_to_write, _ = select.select([],[r],[],1)
-                        if ready_to_write:
-                            ready_to_write[0].send('hello')
-                            ready_to_write[0].send('hello')
+                    #else: # TEMP, TODO
+                        # _, ready_to_write, _ = select.select([],[r],[],1)
+                        # if ready_to_write:
+                        #     ready_to_write[0].send('hello')
+                        #     ready_to_write[0].send('hello')
 
             # for w in ready_wrs:
             #     print 'client send'
             #     print (ready_rds, ready_wrs, exceptional)
+            # TODO when sending: recover from err 32 broken pipe in case
+            # client quits
             #     w.send('hello')
 
             for e in exceptional:

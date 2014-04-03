@@ -37,8 +37,7 @@ class TTTClient(object):
 
     def reset_connection(self):
         ''' Called in __init__ and when peer disconnects. '''
-        if self.sock:
-            self.disconnect()
+        self.disconnect()
         self.sock = socket.socket()
         self.connected = False
         #self.partner = None
@@ -51,7 +50,8 @@ class TTTClient(object):
             return
 
         def raise_surprise(e, errcodes):
-            ''' Propagates exception e if it doesn't match any errcodes '''
+            ''' Propagates exception e if it doesn't match any expected
+                errcodes '''
             if isinstance(e.args,tuple) and any([e[0] == c for c in errcodes]):
                 # we were expecting this one
                 logger.info(str(e))
@@ -105,9 +105,10 @@ class TTTClient(object):
         pass
 
     def disconnect(self):
-        if self.connected:
-            # in case we haven't recv'd everything server sent
-            self.sock.shutdown(socket.SHUT_RDWR)
+        if self.sock:
+            if self.connected:
+                # in case we haven't recv'd everything server sent
+                self.sock.shutdown(socket.SHUT_RDWR)
             self.sock.close()
         self.connected = False
 
@@ -165,9 +166,11 @@ class TUI(object):
             against ai
         '''
         choice = None
-        while choice not in ('a','p'):
+        while choice not in ('a', 'p', 'q'):
             print '\rPlay against (p)erson or (a)i? ',
             choice = sys.stdin.readline().strip()
+            if choice == 'q':
+                self.quit()
             self.client.session_type = choice
 
     def join_session(self):
@@ -176,22 +179,21 @@ class TUI(object):
             Returns true if successful, false otherwise
         '''
         self.CONNMSGS['connect'],
-        self.client.connect()
+        self.allow_interrupt(self.client.connect, 'w')
         # retry
         while not self.client.connected:
             print self.CONNMSGS['failed'],
             choice = None
-            while choice not in ('y','n'):
-                print 'Try again? (y/n) ',
+            while choice not in ('y','n','q'):
+                print 'Try again? (y/n/q) ',
                 choice = sys.stdin.readline().strip()
             if choice == 'y':
-                self.client.connect()
+                self.allow_interrupt(self.client.connect, 'w')
             else:
                 return False
         print self.CONNMSGS['waiting'],
         # TODO, respond to whether this worked
         self.client.establish_session()
-        self.allow_interrupt(self.client.temp_recv_test)
         print self.CONNMSGS['insession'],
         return True
 
@@ -230,32 +232,43 @@ class TUI(object):
             print '\r', self.CONNMSGS['failed']
         print self.PROMPT,
 
-    def allow_interrupt(self, readingfunc):
+    def allow_interrupt(self, func, mode):
         ''' Allow user to quit while we keep trying a function that
             depends on response from server, e.g. give up
-            after waiting for a long time for a response'''
+            after waiting for a long time for a response.
+            mode refers to (r)ead or (w)rite: read is for recv, write
+            is for connect.
+            '''
         # Note, join_session is implemented differently because we want
         # the client to try one and then always give the user to try
         # again or give up.
-        to_read = [self.client.sock, sys.stdin]
-        i = 0
+        to_read = [sys.stdin]
+        to_write = []
+        if mode == 'r':
+            to_read.append(self.client.sock)
+        elif mode == 'w':
+            to_write.append(self.client.sock)
+
         while True:
-            i += 1
-            ready, _, _ = select.select(to_read, [],[], 60)
-            for stream in ready:
-                print '\r',str(i),
+            readyr, readyw, _ = select.select(to_read, to_write,[], 60)
+            for stream in readyr:
                 if stream is self.client.sock:
                     # reading func is responsible for reading everything
                     # it needs in one shot so we can return?
-                    readingfunc()
+                    func()
                     return
                 elif sys.stdin.readline().strip() == 'q':
                     self.quit()
+            for stream in readyw:
+                func()
+                return
+
 
 
 
 def main():
     t = TUI()
+    print "Welcome. Hit 'q' any time to quit."
     t.parse_sessiontype()
     if t.join_session():
         t.playing_loop()
