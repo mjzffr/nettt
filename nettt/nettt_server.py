@@ -4,9 +4,8 @@ import ttt
 import logging
 import sys
 import select
+import random
 
-HOST = 'localhost'
-PORT = 50000
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -18,12 +17,28 @@ handler.setFormatter(formatter)
 logger.addHandler(handler)
 
 
-class Session:
-    ''' Keeps track of game and its two participating clients.'''
-    def __init__(self, firstclient):
-        self.player1 = firstclient
-        self.player2 = None
-        self.game = ttt.TicTacToeGame()
+class Session(object):
+    ''' Keeps track of game and its two participating client sockets.'''
+    def __init__(self, firstclient, sessiontype):
+        self.players = {ttt.BSTATES['P1']:firstclient}
+        self.game = ttt.TicTacToeGame(start=random.choice([ttt.BSTATES['P1'],
+                                                           ttt.BSTATES['P2']]))
+        # 'a' for ai, 'p' for person
+        self.sessiontype = sessiontype
+        if sessiontype == 'a':
+            self.players[ttt.BSTATES['P2']] = 'computer'
+
+
+    def add_player(self, player2):
+        ''' returns True if there was room for a second player (adding
+            a second player succeeded)
+        '''
+        if self.players.get(ttt.BSTATES['P2']):
+            return False
+        else:
+            self.players[ttt.BSTATES['P2']] = player2
+
+        return True
 
     # For now, if a player leaves a gamesession, that gamesession is
     # concluded
