@@ -11,11 +11,11 @@ class TicTacToeGame:
         Can generate computer moves; represent board state as a string; record
         plays actions (move, reset) and their effects.
     '''
-    def __init__(self, size=3, initial_state=None):
+    def __init__(self, size=3, initial_state=None, first=BSTATES['P1']):
         self.SIZE = size
         self.board = [[BSTATES['EMPTY']] * self.SIZE for _ in range(self.SIZE)]
 
-        self.current_player = BSTATES['P1']
+        self.current_player = first
         self.mode = GSTATES['NOTSTARTED']
 
         self.wins = {BSTATES['P1']:0, BSTATES['P2']:0}
