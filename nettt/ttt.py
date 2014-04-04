@@ -141,7 +141,7 @@ class TicTacToeGame:
 
         self.mode, resultcoords = \
             TicTacToeGame.decide_mode(self.board)
-        self.ae()
+        self.update_score()
 
         # <= 2 means draw, xwon or owon
         if self.mode <= 2:
