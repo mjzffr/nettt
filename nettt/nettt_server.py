@@ -112,12 +112,19 @@ class Server(object):
                         print message
 
     def process_responses(self, ready_wrs):
-        # for w in ready_wrs:
-            #     print 'client send'
-            #     print (ready_rds, ready_wrs, exceptional)
+        # clients who are ready for sending and have sent in a request
+        waiting_clients = set(ready_wrs).intersection({i for i in
+                                              set(self.requests.keys())
+                                              if self.requests[i]})
+        for w in waiting_clients:
+            print 'client send'
             # TODO when sending: recover from err 32 broken pipe in case
             # client quits
-            #     w.send('hello')
+            result = w.sendall('+1,-1')
+            if result is None:
+                #success
+                del self.requests[w][0]
+                print len(self.requests[w])
 
         pass
 
