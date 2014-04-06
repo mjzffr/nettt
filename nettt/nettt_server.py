@@ -44,94 +44,90 @@ class Session(object):
     # concluded
     # and his partner is automatically put in a new empty gamesession.
 
-class Server:
+class Server(object):
+    HOST = 'localhost'
+    PORT = 50000
+
     def __init__(self):
         self.readables = []
         self.writables = []
         self.allsockets = []
-        # all initiated games
-        self.sessions = []
-        # which clients belong to which games
+        # which clients belong to which games (sock:session)
         self.sessiondict = {}
-        # a queue of messages?
-        # dictionary of sock : reuqests, dictionary  sock: responses?
+        # sock:queue (queue of requests to respond to)
+        self.requests = {}
 
-    def run(self):
-        listenersock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.listenersock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         #prevent the "already in use error"
-        listenersock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        listenersock.setblocking(False)
+        self.listenersock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        self.listenersock.setblocking(False)
         # TODO: bind raises an exception if port is already in use
-        listenersock.bind((HOST, PORT))
-
-        listenersock.listen(5)
+        self.listenersock.bind((self.HOST, self.PORT))
+        self.listenersock.listen(5)
         print "Server on"
 
-        self.readables = [listenersock, sys.stdin]
-        self.allsockets = [listenersock]
 
+    def run(self):
+        self.readables = [self.listenersock, sys.stdin]
+        self.allsockets = [self.listenersock]
         while True:
             # wait for at least one of the sockets to be ready
-            #import time
-            #time.sleep(10)
             (ready_rds, ready_wrs,
                 exceptional) = select.select(self.readables,
                                              self.writables,
                                              self.allsockets, 60)
+            self.process_requests(ready_rds)
+            self.process_responses(ready_wrs)
+            for e in exceptional:
+                self.delete_socket(e)
 
-            # Process incoming data
-            for r in ready_rds:
-                # accept a client connection
-                if r is listenersock:
-                    clientsock, clientaddr = listenersock.accept()
+    def process_requests(self, ready_rds):
+        for r in ready_rds:
+                if r is self.listenersock:
+                    clientsock, clientaddr = self.listenersock.accept()
                     clientsock.setblocking(False)
                     for iolist in [self.readables, self.writables,
                                    self.allsockets]:
                         iolist.append(clientsock)
+                    # initialize request queue
+                    self.requests[clientsock] = []
                     print 'Connected to ' + str(clientaddr)
                     #logger.info('Connected to ' + str(clientaddr))
-                    #self.assign_to_session(clientsock)
                 elif r is sys.stdin:
                     if (sys.stdin.readline()).strip() == 'exit':
-                        listenersock.close()
+                        self.listenersock.close()
                         print "Server off"
                         sys.exit()
                 # collect a message from each ready client
                 else:
-                    print 'client recv'
-                    print (ready_rds, ready_wrs, exceptional)
                     # TODO
                     # results in err104 connection reset by peer if client
                     # has crashed
                     # When client closes socket, empty string is received
-                    message = r.recv(8)
+                    message = r.recv(1024)
                     if not message:
-                        self.delete_socket(r)
+                        self.disconnect_client(r)
                     else:
+                        self.requests[r].append(message)
                         print message
-                    #else: # TEMP, TODO
-                        # _, ready_to_write, _ = select.select([],[r],[],1)
-                        # if ready_to_write:
-                        #     ready_to_write[0].send('hello')
-                        #     ready_to_write[0].send('hello')
 
-            # for w in ready_wrs:
+    def process_responses(self, ready_wrs):
+        # for w in ready_wrs:
             #     print 'client send'
             #     print (ready_rds, ready_wrs, exceptional)
             # TODO when sending: recover from err 32 broken pipe in case
             # client quits
             #     w.send('hello')
 
-            for e in exceptional:
-                self.delete_socket(e)
+        pass
 
-    def delete_socket(self, sock):
+    def disconnect_client(self, sock):
         for iolist in [self.readables, self.writables, self.allsockets]:
             if sock in iolist:
                 iolist.remove(sock)
         sock.close()
         print 'closed socket'
-                #logger.info('Closed a socket.')
+        #logger.info('Closed a socket.')
 
     # @property
     # def num_sessions(self):
@@ -174,17 +170,6 @@ class Server:
     #     else:
     #         # no data received means that source has disconnected
     #         self.disconnect_client(source)
-
-    def disconnect_client(self, s):
-        # TODO discard session that the client belonged to
-        print "Disconnecting: " + str(s.getpeername())
-        if s in self.writables:
-            self.writables.remove(s)
-        if s in self.readables:
-            self.readables.remove(s)
-        if s in self.allsockets:
-            self.allsockets.remove(s)
-        s.close()
 
 if __name__ == "__main__":
     Server().run()
