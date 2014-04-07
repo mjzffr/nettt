@@ -57,8 +57,8 @@ class Server(object):
         self.allsockets = []
         # which clients belong to which games (sock:session)
         self.sessiondict = {}
-        # sock:queue (queue of requests to respond to)
-        self.requests = {}
+        # sock:queue (queue of responses to send)
+        self.responses = {}
 
         self.listenersock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         #prevent the "already in use error"
@@ -93,7 +93,7 @@ class Server(object):
                 piece = sock.recv(1024)
                 if not piece:
                     self.disconnect_client(sock)
-                    break
+                    return ''
                 else:
                     message = ''.join([message, piece])
             return message.rstrip()
@@ -105,8 +105,8 @@ class Server(object):
                     for iolist in [self.readables, self.writables,
                                    self.allsockets]:
                         iolist.append(clientsock)
-                    # initialize request queue
-                    self.requests[clientsock] = []
+                    # initialize response queue
+                    self.responses[clientsock] = []
                     print 'Connected to ' + str(clientaddr)
                     #logger.info('Connected to ' + str(clientaddr))
                 elif reader is sys.stdin:
@@ -115,9 +115,9 @@ class Server(object):
                 # collect a message from each ready client
                 else:
                     request = recv_all(reader)
-                    # self.responses[reader].append( \
-                            # self.queue_response(request, reader))
-                    print request
+                    print request #XXX
+                    if request:
+                        self.queue_response(request, reader)
 
     def shutdown(self):
         for sock in self.allsockets:
@@ -126,20 +126,19 @@ class Server(object):
         sys.exit()
 
     def process_responses(self, ready_wrs):
-        # clients who are ready for sending and have sent in a request
+        # clients who are ready for sending and for which there is a response
         waiting_clients = set(ready_wrs).intersection({i for i in
-                                              set(self.requests.keys())
-                                              if self.requests[i]})
+                                              set(self.responses.keys())
+                                              if self.responses[i]})
         for w in waiting_clients:
             # TODO when sending: recover from err 32 broken pipe in case
             # client quits
-            result = w.sendall('+1,-1')
-            if result is None:
-                #success
-                del self.requests[w][0]
-                print len(self.requests[w])
-
-        pass
+            try:
+                w.sendall(''.join([self.responses[w][0],self.EOM]))
+                # remove request from queue upon successful response
+                del self.responses[w][0]
+            except socket.error as e:
+                logger.info('Failed to send message: %s' % e)
 
     def disconnect_client(self, sock):
         for iolist in [self.readables, self.writables, self.allsockets]:
@@ -153,20 +152,57 @@ class Server(object):
     # def num_sessions(self):
     #     return len(set(self.sessiondict.values()))
 
+    @property
+    def sessions(self):
+        return set(self.sessionsdict.values())
 
+    def find_free_session(self):
+        ''' returns Session that does not have two players yet or
+        None if such a session doesn't exist
+        '''
+        for session in self.sessions:
+            if not session.players.get(ttt.BSTATES['P2']):
+                return session
 
+    def assign_to_session(self, client, sessiontype):
+        ''' Adds client to an existing or new Session, updates sessiondict and
+            queues reponses to session clients if their Session is ready.
+            returns the resulting Session
+        '''
+        def msg(player, session):
+            p1 = ttt.BSTATES['P1']
+            p2 = ttt.BSTATES['P2']
+            pid = p1 if player is session.players[p1] else p2
+            turn = session.game.current_player
+            return ','.join([str(pid), str(turn)])
 
-    def assign_to_session(client):
-        if len(self.sessions) != 0 and not self.sessions[-1].player2:
-            # add client to last-created session; it is unpaired
-            self.sessiondict[clientsock] = self.sessions[-1]
-            self.sessions[-1].player2 = clientsock
-            # send message to client that it is p1 and it's p2's turn
-        else:
-            gamesession = Session(clientsock)
-            # TODO send message to client that it is p1 and it's p1's turn
-            self.sessiondict[clientsock] = gamesession
-            self.sessions.append(gamesession)
+        # check if client already in session
+        existingsession = self.sessiondict.get(client)
+        if existingsession:
+            return existingsession
+
+        if sessiontype == 'p':
+            free_session = self.find_free_session()
+            if free_session:
+                free_session.add_player(client)
+                self.sessiondict[client] = free_session
+                # add response for both session players to response queue
+                self.responses[client].append(msg(client, free_session))
+                partner = free_session.players[ttt.BSTATES['P1']]
+                self.responses[partner].append(msg(partner, free_session))
+                return free_session
+
+        gamesession = Session(client, sessiontype)
+        self.sessiondict[client] = gamesession
+        # TODO: if playing against ai, queue response to player right away
+        if sessiontype == 'a':
+            self.responses[client].append(msg(client,gamesession))
+            print self.responses[client] # XXX
+        return gamesession
+
+    def queue_response(self, request, clientsock):
+        if request in ['a','p']:
+            self.assign_to_session(clientsock, request)
 
 
     # def broadcast_msg(self, source, destinations):
