@@ -5,6 +5,7 @@ import logging
 import sys
 import select
 import random
+import pdb
 
 
 logger = logging.getLogger(__name__)
@@ -47,6 +48,8 @@ class Session(object):
 class Server(object):
     HOST = 'localhost'
     PORT = 50000
+    # end of message marker
+    EOM = '\n'
 
     def __init__(self):
         self.readables = []
@@ -78,12 +81,25 @@ class Server(object):
                                              self.allsockets, 60)
             self.process_requests(ready_rds)
             self.process_responses(ready_wrs)
-            for e in exceptional:
-                self.delete_socket(e)
+            for sock in exceptional:
+                self.delete_socket(sock)
 
     def process_requests(self, ready_rds):
-        for r in ready_rds:
-                if r is self.listenersock:
+        def recv_all(sock):
+            message = ''
+            while not message.endswith(self.EOM):
+                # TODO: results in err104 connection reset by peer if client
+                # has crashed
+                piece = sock.recv(1024)
+                if not piece:
+                    self.disconnect_client(sock)
+                    break
+                else:
+                    message = ''.join([message, piece])
+            return message.rstrip()
+
+        for reader in ready_rds:
+                if reader is self.listenersock:
                     clientsock, clientaddr = self.listenersock.accept()
                     clientsock.setblocking(False)
                     for iolist in [self.readables, self.writables,
@@ -93,23 +109,21 @@ class Server(object):
                     self.requests[clientsock] = []
                     print 'Connected to ' + str(clientaddr)
                     #logger.info('Connected to ' + str(clientaddr))
-                elif r is sys.stdin:
+                elif reader is sys.stdin:
                     if (sys.stdin.readline()).strip() == 'exit':
-                        self.listenersock.close()
-                        print "Server off"
-                        sys.exit()
+                        self.shutdown()
                 # collect a message from each ready client
                 else:
-                    # TODO
-                    # results in err104 connection reset by peer if client
-                    # has crashed
-                    # When client closes socket, empty string is received
-                    message = r.recv(1024)
-                    if not message:
-                        self.disconnect_client(r)
-                    else:
-                        self.requests[r].append(message)
-                        print message
+                    request = recv_all(reader)
+                    # self.responses[reader].append( \
+                            # self.queue_response(request, reader))
+                    print request
+
+    def shutdown(self):
+        for sock in self.allsockets:
+            sock.close()
+        print 'Server off'
+        sys.exit()
 
     def process_responses(self, ready_wrs):
         # clients who are ready for sending and have sent in a request
@@ -117,7 +131,6 @@ class Server(object):
                                               set(self.requests.keys())
                                               if self.requests[i]})
         for w in waiting_clients:
-            print 'client send'
             # TODO when sending: recover from err 32 broken pipe in case
             # client quits
             result = w.sendall('+1,-1')

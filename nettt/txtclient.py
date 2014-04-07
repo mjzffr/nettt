@@ -29,6 +29,9 @@ logger.addHandler(handler)
 # which player am i?
 
 class TTTClient(object):
+    # end-of-message marker
+    EOM = '\n'
+
     def __init__(self):
         self.sock = None
         self.session_type = 'a'
@@ -79,13 +82,14 @@ class TTTClient(object):
         logger.info('Requested session type' + self.session_type)
         # send type of session (ai or person)
         # expect your player id and turn-status in response
-        self.sock.send(self.session_type)
+        self.sock.sendall(''.join([self.session_type, self.EOM]))
 
     def await_partner(self):
         ''' Expecting to receive string of the form 'xx,yy' where xx and yy
         must be +1 or -1 and xx represents client's role and yy represents
         whose turn it is.
         '''
+        # TODO: use end of msg marker
         response = self.sock.recv(5)
         logger.info('Response: ' + response)
         errmsg = 'Protocol violated: ' + response
