@@ -4,6 +4,7 @@ import errno
 import sys
 import logging
 import select
+import pdb
 
 HOST = 'localhost'
 PORT = 50000
@@ -85,34 +86,32 @@ class TTTClient(object):
         self.sock.sendall(''.join([self.session_type, self.EOM]))
 
     def recv_all(self):
-            message = ''
-            while not message.endswith(self.EOM):
-                # TODO: results in err104 connection reset by peer if client
-                # has crashed
-                piece = self.sock.recv(1024)
-                if not piece:
-                    return ''
-                else:
-                    message = ''.join([message, piece])
-            return message.rstrip()
+        message = ''
+        while not message.endswith(self.EOM):
+            piece = self.sock.recv(1024)
+            if not piece:
+                return ''
+            else:
+                message = ''.join([message, piece])
+        return message.rstrip()
 
 
     def await_partner(self):
-        ''' Expecting to receive string of the form 'xx,yy' where xx and yy
-        must be +1 or -1 and xx represents client's role and yy represents
+        ''' Expecting to receive string of the form 'x,y' where x and y
+        must be 1 or -1 and x represents client's role and y represents
         whose turn it is.
         '''
-        # TODO: use end of msg marker
         response = self.recv_all()
-        logger.info('Response: ' + response)
-        errmsg = 'Protocol violated: ' + response
-        if len(response) != 5:
-            logger.info(errmsg)
-            raise Exception(errmsg)
-        self.role, self.turn = tuple([int(i) for i in response.split(',')])
-        if self.role not in [1, -1] or self.turn not in [1, -1]:
-            logger.info(errmsg)
-            raise Exception(errmsg)
+        print response # XXX
+        # logger.info('Response: ' + response)
+        # errmsg = 'Protocol violated: ' + response
+        # if len(response) != 5:
+        #     logger.info(errmsg)
+        #     raise Exception(errmsg)
+        # self.role, self.turn = tuple([int(i) for i in response.split(',')])
+        # if self.role not in [1, -1] or self.turn not in [1, -1]:
+        #     logger.info(errmsg)
+        #     raise Exception(errmsg)
 
     def request_status(self): #I don't remember what this is for :(
         pass
