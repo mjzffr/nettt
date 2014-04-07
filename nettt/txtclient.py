@@ -84,13 +84,26 @@ class TTTClient(object):
         # expect your player id and turn-status in response
         self.sock.sendall(''.join([self.session_type, self.EOM]))
 
+    def recv_all(self):
+            message = ''
+            while not message.endswith(self.EOM):
+                # TODO: results in err104 connection reset by peer if client
+                # has crashed
+                piece = self.sock.recv(1024)
+                if not piece:
+                    return ''
+                else:
+                    message = ''.join([message, piece])
+            return message.rstrip()
+
+
     def await_partner(self):
         ''' Expecting to receive string of the form 'xx,yy' where xx and yy
         must be +1 or -1 and xx represents client's role and yy represents
         whose turn it is.
         '''
         # TODO: use end of msg marker
-        response = self.sock.recv(5)
+        response = self.recv_all()
         logger.info('Response: ' + response)
         errmsg = 'Protocol violated: ' + response
         if len(response) != 5:
