@@ -22,7 +22,7 @@ class Session(object):
     ''' Keeps track of game and its two participating client sockets.'''
     def __init__(self, firstclient, sessiontype):
         self.players = {ttt.BSTATES['P1']:firstclient}
-        self.game = ttt.TicTacToeGame(start=random.choice([ttt.BSTATES['P1'],
+        self.game = ttt.TicTacToeGame(first=random.choice([ttt.BSTATES['P1'],
                                                            ttt.BSTATES['P2']]))
         # 'a' for ai, 'p' for person
         self.sessiontype = sessiontype
