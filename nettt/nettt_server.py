@@ -110,7 +110,7 @@ class Server(object):
                     print 'Connected to ' + str(clientaddr)
                     #logger.info('Connected to ' + str(clientaddr))
                 elif reader is sys.stdin:
-                    if (sys.stdin.readline()).strip() == 'exit':
+                    if (sys.stdin.readline()).strip() == 'q':
                         self.shutdown()
                 # collect a message from each ready client
                 else:
