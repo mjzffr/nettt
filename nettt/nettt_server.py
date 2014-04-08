@@ -108,7 +108,7 @@ class Server(object):
                                self.allsockets]:
                     iolist.append(clientsock)
                 self.responses[clientsock] = []
-                print 'Connected to ' + str(clientaddr)
+                print 'Connected to ' + str(clientaddr) # XXX
                 #logger.info('Connected to ' + str(clientaddr))
             elif reader is sys.stdin:
                 if (sys.stdin.readline()).strip() == 'q':
@@ -157,7 +157,7 @@ class Server(object):
         sock.close()
         self.responses.pop(sock, False)
         self.sessiondict.pop(sock, False)
-        print 'closed socket'
+        print 'closed socket' # XXX
         #logger.info('Closed a socket.')
 
     def end_session(self, client):
