@@ -107,7 +107,6 @@ class Server(object):
                 for iolist in [self.readables, self.writables,
                                self.allsockets]:
                     iolist.append(clientsock)
-                # initialize response queue
                 self.responses[clientsock] = []
                 print 'Connected to ' + str(clientaddr)
                 #logger.info('Connected to ' + str(clientaddr))
@@ -128,6 +127,7 @@ class Server(object):
         sys.exit()
 
     def process_responses(self, ready_wrs):
+        ''' Sends one message in each client's message queue '''
         # clients who are ready for sending and for which there is a response
         waiting_clients = set(ready_wrs).intersection({i for i in
                                               set(self.responses.keys())
@@ -147,6 +147,9 @@ class Server(object):
                 logger.info('Failed to send message: %s' % e)
 
     def cleanup(self, sock):
+        ''' Removes all data and relationships that depend on `sock` and
+            closes `sock`
+        '''
         for iolist in [self.readables, self.writables, self.allsockets]:
             if sock in iolist:
                 iolist.remove(sock)
@@ -203,7 +206,6 @@ class Server(object):
         existingsession = self.sessiondict.get(client)
         if existingsession:
             return existingsession
-
         if sessiontype == 'p':
             free_session = self.find_free_session()
             if free_session:
@@ -214,41 +216,18 @@ class Server(object):
                 partner = free_session.players[ttt.BSTATES['P1']]
                 self.responses[partner].append(msg(partner, free_session))
                 return free_session
-
+        # 'a' session or new 'p' session
         gamesession = Session(client, sessiontype)
         self.sessiondict[client] = gamesession
-        # TODO: if playing against ai, queue response to player right away
         if sessiontype == 'a':
             self.responses[client].append(msg(client,gamesession))
-            print self.responses[client] # XXX
         return gamesession
 
     def queue_response(self, request, clientsock):
+        ''' Updates self.responses (message queue)'''
         if request in ['a','p']:
             self.assign_to_session(clientsock, request)
 
-
-    # def broadcast_msg(self, source, destinations):
-    #     ''' Send message from source to all other clients in destinations list.
-    #     `destinations` is the result of a select call: if a client wasn't ready
-    #     at that moment, it will never receive this message!
-    #     '''
-    #     msg = source.recv(SIZE)
-    #     if msg:
-    #         for recipient in destinations:
-    #             if recipient is not source:
-    #                 try:
-    #                     recipient.send(msg)
-    #                 except socket.error as e:
-    #                     # remote peer disconnected
-    #                     if isinstance(e.args, tuple) and e[0] == errno.EPIPE:
-    #                         self.cleanup_client(recipient)
-    #                     else:
-    #                         # some other unanticipated issue. :(
-    #                         raise e
-    #     else:
-    #         # no data received means that source has disconnected
-    #         self.cleanup_client(source)
 
 if __name__ == "__main__":
     Server().run()
