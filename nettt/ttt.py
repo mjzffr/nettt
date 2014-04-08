@@ -213,13 +213,6 @@ class TicTacToeGame:
         ''' true if grid is n x n list '''
         return all([len(grid) == len(i) for i in grid])
 
-
-    def play(self):
-        '''stub'''
-        while self.mode == GSTATES['INPROGRESS']:
-            break
-            #TODO
-
     # for testing
     def __str__(self):
         boardstr = ''
