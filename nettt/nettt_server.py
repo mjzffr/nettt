@@ -38,12 +38,11 @@ class Session(object):
             return False
         else:
             self.players[ttt.BSTATES['P2']] = player2
-
         return True
 
-    # For now, if a player leaves a gamesession, that gamesession is
-    # concluded
-    # and his partner is automatically put in a new empty gamesession.
+    # For now, if a player leaves a session, that gamesession is
+    # concluded and his partner is automatically disconnected.
+    # TODO: place abandoned partner in fresh game session instead?
 
 class Server(object):
     HOST = 'localhost'
@@ -69,22 +68,25 @@ class Server(object):
         self.listenersock.listen(5)
         print "Server on"
 
-
     def run(self):
+        ''' Main loop '''
         self.readables = [self.listenersock, sys.stdin]
         self.allsockets = [self.listenersock]
         while True:
-            # wait for at least one of the sockets to be ready
             (ready_rds, ready_wrs,
                 exceptional) = select.select(self.readables,
                                              self.writables,
                                              self.allsockets, 60)
             self.process_requests(ready_rds)
             self.process_responses(ready_wrs)
+            # ??? This seems to never be triggered.
             for sock in exceptional:
-                self.delete_socket(sock)
+                self.cleanup(sock)
 
     def process_requests(self, ready_rds):
+        ''' Accepts connections and input; queues responses to incoming
+            requests
+        '''
         def recv_all(sock):
             message = ''
             while not message.endswith(self.EOM):
@@ -92,32 +94,32 @@ class Server(object):
                 # has crashed
                 piece = sock.recv(1024)
                 if not piece:
-                    self.disconnect_client(sock)
+                    self.cleanup(sock)
                     return ''
                 else:
                     message = ''.join([message, piece])
             return message.rstrip()
 
         for reader in ready_rds:
-                if reader is self.listenersock:
-                    clientsock, clientaddr = self.listenersock.accept()
-                    clientsock.setblocking(False)
-                    for iolist in [self.readables, self.writables,
-                                   self.allsockets]:
-                        iolist.append(clientsock)
-                    # initialize response queue
-                    self.responses[clientsock] = []
-                    print 'Connected to ' + str(clientaddr)
-                    #logger.info('Connected to ' + str(clientaddr))
-                elif reader is sys.stdin:
-                    if (sys.stdin.readline()).strip() == 'q':
-                        self.shutdown()
-                # collect a message from each ready client
-                else:
-                    request = recv_all(reader)
-                    print request #XXX
-                    if request:
-                        self.queue_response(request, reader)
+            if reader is self.listenersock:
+                clientsock, clientaddr = self.listenersock.accept()
+                clientsock.setblocking(False)
+                for iolist in [self.readables, self.writables,
+                               self.allsockets]:
+                    iolist.append(clientsock)
+                # initialize response queue
+                self.responses[clientsock] = []
+                print 'Connected to ' + str(clientaddr)
+                #logger.info('Connected to ' + str(clientaddr))
+            elif reader is sys.stdin:
+                if (sys.stdin.readline()).strip() == 'q':
+                    self.shutdown()
+            # collect a message from each ready client
+            else:
+                request = recv_all(reader)
+                print request #XXX
+                if request:
+                    self.queue_response(request, reader)
 
     def shutdown(self):
         for sock in self.allsockets:
@@ -131,22 +133,43 @@ class Server(object):
                                               set(self.responses.keys())
                                               if self.responses[i]})
         for w in waiting_clients:
+            #pdb.set_trace()
             # TODO when sending: recover from err 32 broken pipe in case
             # client quits
             try:
-                w.sendall(''.join([self.responses[w][0],self.EOM]))
+                message = self.responses[w][0]
+                w.sendall(''.join([message,self.EOM]))
                 # remove request from queue upon successful response
                 del self.responses[w][0]
+                if message == 'error':
+                    self.cleanup(w)
             except socket.error as e:
                 logger.info('Failed to send message: %s' % e)
 
-    def disconnect_client(self, sock):
+    def cleanup(self, sock):
         for iolist in [self.readables, self.writables, self.allsockets]:
             if sock in iolist:
                 iolist.remove(sock)
+        self.end_session(sock)
         sock.close()
+        self.responses.pop(sock, False)
+        self.sessiondict.pop(sock, False)
         print 'closed socket'
         #logger.info('Closed a socket.')
+
+    def end_session(self, client):
+        ''' Notify all session participants that `client` is leaving the session to which she belongs.
+        '''
+        session = self.sessiondict.get(client)
+        if not session:
+            return
+        # remove other human player
+        if session.sessiontype == 'p':
+            for player in session.players.values():
+                if player is not client:
+                    #pdb.set_trace()
+                    self.responses[player] = ['error']
+                    self.sessiondict.pop(player, False)
 
     # @property
     # def num_sessions(self):
@@ -154,7 +177,7 @@ class Server(object):
 
     @property
     def sessions(self):
-        return set(self.sessionsdict.values())
+        return set(self.sessiondict.values())
 
     def find_free_session(self):
         ''' returns Session that does not have two players yet or
@@ -219,13 +242,13 @@ class Server(object):
     #                 except socket.error as e:
     #                     # remote peer disconnected
     #                     if isinstance(e.args, tuple) and e[0] == errno.EPIPE:
-    #                         self.disconnect_client(recipient)
+    #                         self.cleanup_client(recipient)
     #                     else:
     #                         # some other unanticipated issue. :(
     #                         raise e
     #     else:
     #         # no data received means that source has disconnected
-    #         self.disconnect_client(source)
+    #         self.cleanup_client(source)
 
 if __name__ == "__main__":
     Server().run()

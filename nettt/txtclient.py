@@ -102,19 +102,16 @@ class TTTClient(object):
         whose turn it is.
         '''
         response = self.recv_all()
-        print response # XXX
-        # logger.info('Response: ' + response)
-        # errmsg = 'Protocol violated: ' + response
-        # if len(response) != 5:
-        #     logger.info(errmsg)
-        #     raise Exception(errmsg)
-        # self.role, self.turn = tuple([int(i) for i in response.split(',')])
-        # if self.role not in [1, -1] or self.turn not in [1, -1]:
-        #     logger.info(errmsg)
-        #     raise Exception(errmsg)
-
-    def request_status(self): #I don't remember what this is for :(
-        pass
+        logger.info('Response: ' + response)
+        errmsg = 'Protocol violated: ' + response
+        if not response:
+            logger.info('Server disconnected?')
+            raise Exception(errmsg)
+        print response
+        self.role, self.turn = tuple(int(i) for i in response.split(','))
+        if self.role not in [1, -1] or self.turn not in [1, -1]:
+            logger.info(errmsg)
+            raise Exception(errmsg)
 
     def request_move(self):
         pass
