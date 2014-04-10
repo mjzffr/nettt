@@ -29,6 +29,14 @@ class Session(object):
         if sessiontype == 'a':
             self.players[ttt.BSTATES['P2']] = 'computer'
 
+    def get_player_ids(self, clientsock):
+        ''' return tuple (clientsockid, opponentid) '''
+        if clientsock not in self.players.values():
+            return None
+        if self.players[ttt.BSTATES['P1']] is clientsock:
+            return (ttt.BSTATES['P1'], ttt.BSTATES['P2'])
+        else:
+            return (ttt.BSTATES['P2'], ttt.BSTATES['P1'])
 
     def add_player(self, player2):
         ''' returns True if there was room for a second player (adding
@@ -138,6 +146,7 @@ class Server(object):
             # client quits
             try:
                 message = self.responses[w][0]
+                print message
                 w.sendall(''.join([message,self.EOM]))
                 # remove request from queue upon successful response
                 del self.responses[w][0]
@@ -190,9 +199,9 @@ class Server(object):
             if not session.players.get(ttt.BSTATES['P2']):
                 return session
 
-    def assign_to_session(self, client, sessiontype):
+    def queue_session(self, client, sessiontype):
         ''' Adds client to an existing or new Session, updates sessiondict and
-            queues reponses to session clients if their Session is ready.
+            queues responses to session clients if their Session is ready.
             returns the resulting Session
         '''
         def msg(player, session):
@@ -220,13 +229,48 @@ class Server(object):
         gamesession = Session(client, sessiontype)
         self.sessiondict[client] = gamesession
         if sessiontype == 'a':
-            self.responses[client].append(msg(client,gamesession))
+            self.responses[client].append(msg(client, gamesession))
         return gamesession
 
     def queue_response(self, request, clientsock):
         ''' Updates self.responses (message queue)'''
         if request in ['a','p']:
-            self.assign_to_session(clientsock, request)
+            session = self.queue_session(clientsock, request)
+            if request == 'a' and session.game.current_player == ttt.BSTATES['P2']:
+                session.game.make_random_move(ttt.BSTATES['P2'])
+                self.responses[clientsock].append(session.game.boardstr)
+        elif request == 'n':
+            pass # new game
+        else:
+            try:
+                row, col = [int(i) for i in request.split(',', 1)]
+                self.queue_boardstate(clientsock, row, col)
+            except Exception as e:
+                self.responses[clientsock].append('error')
+                logger.info('Error with request' + str(e))
+
+    def queue_boardstate(self, clientsock, row, col):
+        ''' Makes the client's requested move and adds new boardstate to
+            message queue of opponent, unless opponent is ai.
+            If opponent is 'ai', computes ai move and adds new boardstate to
+            message queue to same client
+        '''
+        session = self.sessiondict.get(clientsock)
+        if not session:
+            self.responses[clientsock].append('error')
+            logger.info('Error with session: ' + str(e))
+            return
+        thisplayerid, opponentid = session.get_player_ids(clientsock)
+        try:
+            session.game.make_move(thisplayerid, (row, col))
+            if session.sessiontype == 'a':
+                session.game.make_random_move(opponentid)
+                self.responses[clientsock].append(session.game.boardstr)
+            elif session.sessiontype == 'p':
+                self.responses[session.players[opponentid]].append(session.game.boardstr)
+        except Exception as e:
+            self.responses[clientsock].append('error')
+            logger.info('Error with move: ' + str(e))
 
 
 if __name__ == "__main__":

@@ -21,11 +21,13 @@ class TTTClient(object):
     EOM = '\n'
     HOST = 'localhost'
     PORT = 50000
+    SIZE = 3
 
     def __init__(self):
         self.sock = None
         self.sessiontype = 'a'
         self.reset_connection()
+        self.lastboardstr = ''
 
 
     def reset_connection(self):
@@ -33,10 +35,13 @@ class TTTClient(object):
         self.disconnect()
         self.sock = socket.socket()
         self.connected = False
-        self.turn = None
+        self.starter = None
         # (p)erson or (a)i
         self.role = None
 
+    @property
+    def i_go_first(self):
+        return self.starter == self.role
 
     def connect(self):
         if self.connected:
@@ -72,37 +77,61 @@ class TTTClient(object):
         self.sock.sendall(''.join([self.sessiontype, self.EOM]))
 
     def recv_all(self):
-        ''' recvs data until end-of-message marker is encountered'''
+        ''' recvs data until end-of-message marker is encountered
+        It is possible that two messages will be sent in one shot.
+        The only time two messages should be received if the first move
+        belongs to the other player and the player is ai.'''
         message = ''
         while not message.endswith(self.EOM):
-            piece = self.sock.recv(1024)
+            if len(message) > 100:
+                errmsg = 'Length limit exceeded'
+                logger.info(errmsg)
+                raise Exception(errmsg)
+            piece = self.sock.recv(64)
             if not piece:
-                return ''
+                message = ''
+                break
             else:
                 message = ''.join([message, piece])
-        return message.rstrip()
-
+        allmessages = message.rstrip().split('\n')
+        logger.info('Response: ' + str(allmessages))
+        if not allmessages or not allmessages[0]:
+            logger.info('Server disconnected?')
+            raise Exception('Server disconnected?')
+        if 'error' in allmessages:
+            raise Exception('Rejected by server')
+        if len(allmessages) > 2:
+            raise Exception('Protocol violated')
+        if len(allmessages) == 2:
+            self.lastboardstr = allmessages[1]
+        return allmessages[0]
 
     def await_partner(self):
-        ''' Expects to recv string of the form 'x,y' where x and y
-        must be 1 or -1 and x represents client's role and y represents
-        whose turn it is.
+        ''' Updates role and starter. Expects to recv string of the form
+        'x,y' where x and y must be 1 or -1, x represents client's role and
+        y represents who gets the first move.
         '''
         response = self.recv_all()
-        logger.info('Response: ' + response)
-        errmsg = 'Protocol violated: ' + response
-        if not response:
-            # ??? What is best approach here? Exceptions right way to go?
-            logger.info('Server disconnected?')
-            raise Exception(errmsg)
         print response # XXX
-        self.role, self.turn = tuple(int(i) for i in response.split(','))
-        if self.role not in [1, -1] or self.turn not in [1, -1]:
+        self.role, self.starter = [int(i) for i in response.split(',', 1)]
+        if self.role not in [1, -1] or self.starter not in [1, -1]:
             logger.info(errmsg)
-            raise Exception(errmsg)
+            raise Exception('Protocol violated')
 
-    def request_move(self):
-        pass
+    def await_gameupdate(self):
+        ''' Returns new board/game state recv'd from server.'''
+        response = self.recv_all()
+        is_valid = response.count(';') == self.SIZE - 1 or \
+            response.count(',') == self.SIZE * (self.SIZE - 1)
+        if not is_valid:
+            raise Exception('Protocol violated')
+        else:
+            self.lastboardstr = response
+
+
+    def request_move(self, row, col):
+        ''' Sends move to server '''
+        self.sock.sendall(''.join([str(row), ',', str(col), self.EOM]))
 
     def request_newgame(self):
         pass
@@ -139,7 +168,6 @@ class TUI(object):
 
     def __init__(self):
         self.client = TTTClient()
-        self.tempgame = ttt.TicTacToeGame() # XXX for early testing
 
     def parse_playinput(self, rawcmd):
         ''' Responds to commands '''
@@ -153,7 +181,8 @@ class TUI(object):
             pass
         elif cmd.startswith('m'):
             try:
-                self.parse_move(cmd)
+                row, col = self.parse_move(cmd)
+                self.client.request_move(row, col)
             except ValueError as e:
                 print 'Invalid command. Try h for help. -- ', e
         else:
@@ -201,7 +230,7 @@ class TUI(object):
                 return False
         print self.CONNMSGS['waiting'],
         self.client.request_session()
-        # expect player id and turn-status in response to session request
+        # expect player id and starter-status in response to session request
         self.allow_interrupt(self.client.await_partner, 'r')
         return True
 
@@ -209,22 +238,27 @@ class TUI(object):
         ''' This should be called after parse_sessiontype and join_session
             have succeeded.
         '''
+        pdb.set_trace()
         print "Instructions: play tic tac toe. Here's how:"
         print self.HELPMSG
+        if self.client.i_go_first or self.client.sessiontype == 'a':
+            self.print_view(self.client.lastboardstr)
+            self.parse_playinput(sys.stdin.readline().strip())
         while True:
-            self.print_view()
+            self.allow_interrupt(self.client.await_gameupdate, 'r')
+            self.print_view(self.client.lastboardstr)
             self.parse_playinput(sys.stdin.readline().strip())
 
+
+
     def parse_move(self, cmd):
-        ''' Interprets command of the form 'm 5 6' '''
+        ''' Interprets command of the form 'm 5 6' as a row, col tuple'''
         if not cmd.startswith('m ') or cmd.count(' ') != 2:
             raise ValueError("Move must be of the form 'm row col")
-        row, col = tuple([int(i) for i in cmd[2:].split()])
-        # XXX for early testing
-        self.tempgame.make_move(self.client.role, (row,col))
+        return tuple([int(i) for i in cmd[2:].split()])
 
 
-    def print_view(self):
+    def print_view(self, boardstring):
         ''' Displays UI '''
         if self.client.connected:
             print self.CONNMSGS['insession'], (self.PLAYER_LABELS[
@@ -233,16 +267,37 @@ class TUI(object):
             print 'Won, Lost: ', str((0,0))
             print 'Session Type:', self.client.sessiontype
             # summary of opponent's move TODO
-            if self.client.turn == self.client.role:
+            if self.client.i_go_first:
                 print self.TURNMSGS['you']
             else:
                 print self.TURNMSGS['partner']
             # board state
             # TODO: for early testing
-            print self.tempgame
+            # translate string sent by server (boardstring)
+            if boardstring:
+                print TUI.pretty_board(boardstring)
+            else:
+                print "___\n___\n___\n"
         else:
             print self.CONNMSGS['failed']
         print self.PROMPT,
+
+    @staticmethod
+    def pretty_board(boardstring):
+        ''' Takes string of the from '0,0,0;1,0,1;0,0,0' and prints
+        2D board'''
+        board = ttt.TicTacToeGame.str_to_grid(boardstring)
+        prettyboard = ''
+        for row in board:
+            for i in row:
+                if i == ttt.BSTATES['P1']:
+                    prettyboard = ''.join([prettyboard, 'X'])
+                elif i == ttt.BSTATES['P2']:
+                    prettyboard = ''.join([prettyboard, 'O'])
+                else:
+                    prettyboard = ''.join([prettyboard, '_'])
+            prettyboard = ''.join([prettyboard, '\n'])
+        return prettyboard
 
     def allow_interrupt(self, func, mode):
         ''' Allow user to quit while we keep trying a function that
@@ -250,6 +305,7 @@ class TUI(object):
             after waiting for a long time for a response.
             `mode` refers to (r)ead or (w)rite: read is for a `func` that
             contains a recv, write is for a connect.
+            Returns whatever `func` returns.
         '''
         to_read = [sys.stdin]
         to_write = []
@@ -263,13 +319,11 @@ class TUI(object):
                 if stream is self.client.sock:
                     # reading func is responsible for reading everything
                     # it needs in one shot so we can return
-                    func()
-                    return
+                    return func()
                 elif sys.stdin.readline().strip() == 'q':
                     self.quit()
             for stream in readyw:
-                func()
-                return
+                return func()
 
 
 def main():
