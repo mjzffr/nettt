@@ -169,25 +169,29 @@ class TUI(object):
     def __init__(self):
         self.client = TTTClient()
 
-    def parse_playinput(self, rawcmd):
+    def process_input(self):
         ''' Responds to commands '''
-        cmd = rawcmd.strip().lower()
-        if cmd == 'h':
-            print self.HELPMSG
-        elif cmd == 'q':
-            self.quit()
-        elif cmd == 'n':
-            # if game in progress send forfeit, else do nothing
-            pass
-        elif cmd.startswith('m'):
-            try:
-                row, col = self.parse_move(cmd)
-                self.client.request_move(row, col)
-            except ValueError as e:
-                print 'Invalid command. Try h for help. -- ', e
-        else:
-            print 'INVALID COMMAND'
-            print self.HELPMSG
+        while True:
+            print self.PROMPT,
+            cmd = sys.stdin.readline().strip().lower()
+            if cmd == 'h':
+                print self.HELPMSG
+            elif cmd == 'q':
+                self.quit()
+                break
+            elif cmd == 'n':
+                # if game in progress: send forfeit, else do nothing
+                pass
+            elif cmd.startswith('m'):
+                try:
+                    row, col = self.parse_move(cmd)
+                    self.client.request_move(row, col)
+                    break
+                except ValueError as e:
+                    print 'Invalid command. Try h for help. -- ', e
+            else:
+                print 'INVALID COMMAND'
+                print self.HELPMSG
 
     def quit(self):
         self.client.disconnect()
@@ -238,27 +242,26 @@ class TUI(object):
         ''' This should be called after parse_sessiontype and join_session
             have succeeded.
         '''
-        pdb.set_trace()
         print "Instructions: play tic tac toe. Here's how:"
         print self.HELPMSG
         if self.client.i_go_first or self.client.sessiontype == 'a':
-            self.print_view(self.client.lastboardstr)
-            self.parse_playinput(sys.stdin.readline().strip())
+            self.print_view()
+            self.process_input()
         while True:
             self.allow_interrupt(self.client.await_gameupdate, 'r')
-            self.print_view(self.client.lastboardstr)
-            self.parse_playinput(sys.stdin.readline().strip())
+            self.print_view()
+            self.process_input()
 
 
 
     def parse_move(self, cmd):
         ''' Interprets command of the form 'm 5 6' as a row, col tuple'''
-        if not cmd.startswith('m ') or cmd.count(' ') != 2:
+        if not cmd.startswith('m ') or cmd.count(' ') < 2:
             raise ValueError("Move must be of the form 'm row col")
         return tuple([int(i) for i in cmd[2:].split()])
 
 
-    def print_view(self, boardstring):
+    def print_view(self):
         ''' Displays UI '''
         if self.client.connected:
             print self.CONNMSGS['insession'], (self.PLAYER_LABELS[
@@ -267,26 +270,23 @@ class TUI(object):
             print 'Won, Lost: ', str((0,0))
             print 'Session Type:', self.client.sessiontype
             # summary of opponent's move TODO
-            if self.client.i_go_first:
-                print self.TURNMSGS['you']
-            else:
-                print self.TURNMSGS['partner']
+            # if self.client.i_go_first:
+            #     print self.TURNMSGS['you']
+            # else:
+            #     print self.TURNMSGS['partner']
             # board state
             # TODO: for early testing
             # translate string sent by server (boardstring)
-            if boardstring:
-                print TUI.pretty_board(boardstring)
-            else:
-                print "___\n___\n___\n"
+            print self.pretty_board()
         else:
             print self.CONNMSGS['failed']
-        print self.PROMPT,
 
-    @staticmethod
-    def pretty_board(boardstring):
+    def pretty_board(self):
         ''' Takes string of the from '0,0,0;1,0,1;0,0,0' and prints
         2D board'''
-        board = ttt.TicTacToeGame.str_to_grid(boardstring)
+        if not self.client.lastboardstr:
+            return "___\n___\n___\n"
+        board = ttt.TicTacToeGame.str_to_grid(self.client.lastboardstr)
         prettyboard = ''
         for row in board:
             for i in row:
