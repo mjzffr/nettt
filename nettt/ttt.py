@@ -219,10 +219,10 @@ class TicTacToeGame:
         for row in self.board:
             for i in row:
                 if i == BSTATES['P1']:
-                    boardstr += 'X'
+                    boardstr = ''.join([boardstr, 'X'])
                 elif i == BSTATES['P2']:
-                    boardstr += 'O'
+                    boardstr = ''.join([boardstr, 'O'])
                 else:
-                    boardstr += '_'
-            boardstr += '\n'
+                    boardstr = ''.join([boardstr, '_'])
+            boardstr = ''.join([boardstr, '\n'])
         return boardstr
