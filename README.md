@@ -10,7 +10,21 @@ While the server (`nettt_server.py`) is running, several clients can connect and
 
 ## Current state
 
-There are two UIs for the client side: `nettt_gui.py` and `txtclient.py`. I'm nolonger developing the GUI for now because I don't want to figure out how to have tkinter interact with sockets. So the focus for now is on `txtclient.py`. So far, all that works is that a player can join a "session" and that session can either be with another human player or a computer. The sending of moves/receiving of updates is not implemented yet.
+There are two UIs for the client side: `nettt_gui.py` and `txtclient.py`. I'm nolonger developing the GUI for now because my priority is to get comfortable with socket programming, rather than think about how to have tkinter interact with sockets. (Twisted?) So the focus for now is on `txtclient.py`. 
+
+What works so far: 
+
+* The user can join a "session" and that session can either be with another human player or a computer. 
+* The user can send moves to play against the server's ai or another human
+* Waiting for server response does not block the game: you can quit at any time.
+* If one player quits, his parter is kicked off and the session is deleted.
+
+What doesn't work yet:
+* The server is not fully hooked up with the game logic: i.e. it crashes if
+** end-of-game occurs
+** client sends illegal move
+** client moves out of turn
+* The server doesn't give the client any feedback about things that went wrong; the client just gets kicked off in response to an illegal move, say
 
 ## How to run
 
