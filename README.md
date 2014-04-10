@@ -24,7 +24,7 @@ What doesn't work yet:
     * end-of-game occurs
     * client sends illegal move
     * client moves out of turn
-    * The server doesn't give the client any feedback about things that went wrong; the client just gets kicked off in response to an illegal move, say
+* The server doesn't give the client any feedback about things that went wrong; the client just gets kicked off in response to an illegal move, say
 
 ## How to run
 
