@@ -28,6 +28,8 @@ What doesn't work yet:
 
 ## How to run
 
+You probably need to use Linux because I don't think Windows likes it when we use `select` on `stdin`. It's probably fine on Mac OS, but if you run the GUI it will look very weird.
+
 Install the requirements first: `pip install -r requirements.txt` (Optional, unless you want to run the tests.)
 
 * Start the server: `./nettt_server.py`
