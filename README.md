@@ -17,14 +17,14 @@ What works so far:
 * The user can join a "session" and that session can either be with another human player or a computer. 
 * The user can send moves to play against the server's ai or another human
 * Waiting for server response does not block the game: you can quit at any time.
-* If one player quits, his parter is kicked off and the session is deleted.
+* If one player quits, his partner is kicked off and the session is deleted.
 
 What doesn't work yet:
 * The server is not fully hooked up with the game logic: i.e. it crashes if
-** end-of-game occurs
-** client sends illegal move
-** client moves out of turn
-* The server doesn't give the client any feedback about things that went wrong; the client just gets kicked off in response to an illegal move, say
+    * end-of-game occurs
+    * client sends illegal move
+    * client moves out of turn
+    * The server doesn't give the client any feedback about things that went wrong; the client just gets kicked off in response to an illegal move, say
 
 ## How to run
 
