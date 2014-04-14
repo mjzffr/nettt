@@ -24,7 +24,6 @@ What doesn't work yet:
     * end-of-game occurs: server sends info that game is over, but client can't start new game or receive his game states (score)
     * client sends illegal move: server sends error and client responds by crashing
     * client moves out-of-turn: the client code doesn't allow this, but if it did, the server would just crash
-* In the two-human game, player's who goes second isn't told that he is waiting for other player to go.
 
 ## How to run
 

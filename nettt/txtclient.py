@@ -271,6 +271,8 @@ class TUI(object):
         if self.client.i_go_first or self.client.sessiontype == 'a':
             self.print_view()
             self.process_input()
+        elif self.client.sessiontype == 'p':
+            print self.CONNMSGS['waiting']
         while True:
             self.allow_interrupt(self.client.await_gameupdate, 'r')
             self.print_view()
