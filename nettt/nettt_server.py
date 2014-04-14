@@ -6,6 +6,7 @@ import sys
 import select
 import random
 import pdb
+import errno
 
 
 logger = logging.getLogger(__name__)
@@ -100,7 +101,14 @@ class Server(object):
             while not message.endswith(self.EOM):
                 # TODO: results in err104 connection reset by peer if client
                 # has crashed
-                piece = sock.recv(1024)
+                piece = None
+                try:
+                    piece = sock.recv(1024)
+                except socket.error as e:
+                    if isinstance(e.args,tuple) and e[0] == errno.ECONNRESET:
+                        logger.info(str(e))
+                    else:
+                        raise e
                 if not piece:
                     self.cleanup(sock)
                     return ''
