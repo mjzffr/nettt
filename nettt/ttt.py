@@ -52,8 +52,6 @@ class TicTacToeGame:
         ''' player is 1 or -1 (for X or O)
             in addition to updating board, returns the location that was changed
         '''
-        if self.is_over():
-            raise Exception("No game in progress. Game over.")
 
         location = random.choice(self.get_locations(self.board,
                                  BSTATES['EMPTY']))
@@ -68,7 +66,7 @@ class TicTacToeGame:
                 enumerate(board) for ci,spot in
                 enumerate(row) if spot == bstate]
 
-
+    @property
     def is_over(self):
         #print "Check %s" % self.mode
         return self.mode <= 2
@@ -90,11 +88,10 @@ class TicTacToeGame:
     def make_move(self, player, (row, col)):
         ''' player is 1 or -1 (for X or O)
             in addition to updating board, also returns location that was
-            changed
+            changed. Returns None if the game is over (move didn't work)
         '''
-        if self.is_over():
-            raise Exception("No game in progress. Game over.")
-
+        if self.is_over:
+            return
         # validate
         size = self.SIZE
         if player != self.current_player:
@@ -144,7 +141,7 @@ class TicTacToeGame:
         self.update_score()
 
         # <= 2 means draw, xwon or owon
-        if self.mode <= 2:
+        if self.is_over:
             self.lastwincoords = resultcoords
 
 
