@@ -132,7 +132,7 @@ class Server(object):
             # collect a message from each ready client
             else:
                 request = recv_all(reader)
-                print request #XXX
+                print 'request:', request #XXX
                 if request:
                     self.queue_response(request, reader)
 
@@ -154,7 +154,7 @@ class Server(object):
             # client quits
             try:
                 message = self.responses[w][0]
-                print message
+                print 'message:', message
                 w.sendall(''.join([message,self.EOM]))
                 # remove request from queue upon successful response
                 del self.responses[w][0]
@@ -240,45 +240,60 @@ class Server(object):
             self.responses[client].append(msg(client, gamesession))
         return gamesession
 
-    def queue_response(self, request, clientsock):
+    def queue_response(self, req, clientsock):
         ''' Updates self.responses (message queue)'''
-        if request in ['a','p']:
-            session = self.queue_session(clientsock, request)
-            if request == 'a' and session.game.current_player == ttt.BSTATES['P2']:
+        if req in ['a','p']:
+            session = self.queue_session(clientsock, req)
+            if req == 'a' and session.game.current_player == ttt.BSTATES['P2']:
                 session.game.make_random_move(ttt.BSTATES['P2'])
                 self.responses[clientsock].append(session.game.boardstr)
-        elif request == 'n':
+        elif req == 'n':
             pass # new game
         else:
             try:
-                row, col = [int(i) for i in request.split(',', 1)]
+                row, col = [int(i) for i in req.split(',', 1)]
                 self.queue_boardstate(clientsock, row, col)
             except Exception as e:
                 self.responses[clientsock].append('error')
                 logger.info('Error with request' + str(e))
 
-    def queue_boardstate(self, clientsock, row, col):
+    def queue_boardstate(self, client, row, col):
         ''' Makes the client's requested move and adds new boardstate to
             message queue of opponent, unless opponent is ai.
             If opponent is 'ai', computes ai move and adds new boardstate to
             message queue to same client
         '''
-        session = self.sessiondict.get(clientsock)
+        session = self.sessiondict.get(client)
         if not session:
-            self.responses[clientsock].append('error')
+            self.responses[client].append('error')
             logger.info('Error with session: ' + str(e))
             return
-        thisplayerid, opponentid = session.get_player_ids(clientsock)
-        try:
-            session.game.make_move(thisplayerid, (row, col))
-            if session.sessiontype == 'a':
-                session.game.make_random_move(opponentid)
-                self.responses[clientsock].append(session.game.boardstr)
-            elif session.sessiontype == 'p':
-                self.responses[session.players[opponentid]].append(session.game.boardstr)
-        except Exception as e:
-            self.responses[clientsock].append('error')
-            logger.info('Error with move: ' + str(e))
+        clientid, opponentid = session.get_player_ids(client)
+        opponent = session.players[opponentid]
+
+        def move(movefunc, args):
+            try:
+                movefunc(*args)
+                if session.game.is_over:
+                    # TODO, should also send scores?
+                    self.responses[client].append('gg')
+                    if session.sessiontype == 'p':
+                        self.responses[opponent].append('gg')
+                        self.responses[client].append(session.game.boardstr)
+                return session.game.is_over
+            except Exception as e:
+                self.responses[client].append('error')
+                logger.info('Error with move: ' + str(e))
+
+        gameover = move(session.game.make_move, [clientid, (row, col)])
+        if gameover is None:
+            return
+        if session.sessiontype == 'a':
+            if not gameover:
+                move(session.game.make_random_move, [opponentid])
+            self.responses[client].append(session.game.boardstr)
+        if session.sessiontype == 'p':
+            self.responses[opponent].append(session.game.boardstr)
 
 
 if __name__ == "__main__":

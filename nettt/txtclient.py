@@ -79,8 +79,9 @@ class TTTClient(object):
     def recv_all(self):
         ''' recvs data until end-of-message marker is encountered
         It is possible that two messages will be sent in one shot.
-        The only time two messages should be received if the first move
-        belongs to the other player and the player is ai.'''
+        The only time two messages should be received if it's the initial
+        server response OR the game is over.
+        '''
         message = ''
         while not message.endswith(self.EOM):
             if len(message) > 100:
@@ -98,20 +99,44 @@ class TTTClient(object):
         if not allmessages or not allmessages[0]:
             logger.info('Server disconnected?')
             raise Exception('Server disconnected?')
+        return allmessages
+
+    def validate_response(self, allmessages):
         if 'error' in allmessages:
             raise Exception('Rejected by server')
+        if 'gg' in allmessages: #xxx
+            print "GAME OVER" # xxx
         if len(allmessages) > 2:
             raise Exception('Protocol violated')
         if len(allmessages) == 2:
-            self.lastboardstr = allmessages[1]
-        return allmessages[0]
+            if not self.valid_boardstr(allmessages[1]):
+                raise Exception('Protocol violated')
+
+    def update_board_get_alert(self):
+        ''' Updates board to string last received from server. Returns
+        additional info (alert) sent by server, if any. "role" and "gg" are
+        examples of alerts. What message list might look like:
+        - [role]            <-- beginning of p game, or ai game (ai plays 2nd)
+        - [role, boardstr]  <-- beginning of ai game, ai plays first
+        - [boardstr]        <-- mid-game
+        - [gg, boardstr]    <-- after final move of game
+        - [...,error,...]   <-- server did not like what client sent
+        '''
+        messages = self.recv_all()
+        self.validate_response(messages)
+        if len(messages) == 2:
+            self.lastboardstr = messages[1]
+        elif self.valid_boardstr(messages[0]):
+            self.lastboardstr = messages[0]
+            return
+        return messages[0]
 
     def await_partner(self):
         ''' Updates role and starter. Expects to recv string of the form
         'x,y' where x and y must be 1 or -1, x represents client's role and
         y represents who gets the first move.
         '''
-        response = self.recv_all()
+        response = self.update_board_get_alert()
         print response # XXX
         self.role, self.starter = [int(i) for i in response.split(',', 1)]
         if self.role not in [1, -1] or self.starter not in [1, -1]:
@@ -120,14 +145,13 @@ class TTTClient(object):
 
     def await_gameupdate(self):
         ''' Returns new board/game state recv'd from server.'''
-        response = self.recv_all()
-        is_valid = response.count(';') == self.SIZE - 1 or \
-            response.count(',') == self.SIZE * (self.SIZE - 1)
-        if not is_valid:
-            raise Exception('Protocol violated')
-        else:
-            self.lastboardstr = response
+        response = self.update_board_get_alert()
+        if response:
+            print "Yep, game over. Now what?"
 
+    def valid_boardstr(self, response):
+        return response.count(';') == self.SIZE - 1 or \
+            response.count(',') == self.SIZE * (self.SIZE - 1)
 
     def request_move(self, row, col):
         ''' Sends move to server '''
@@ -146,7 +170,7 @@ class TTTClient(object):
             self.sock.close()
         self.connected = False
 
-    def recv_update(self):
+    def recv_score(self):
         ''' get board state and stats from server'''
         pass
 
