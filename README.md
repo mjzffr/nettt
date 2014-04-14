@@ -20,11 +20,11 @@ What works so far:
 * If one player quits, his partner is kicked off and the session is deleted.
 
 What doesn't work yet:
-* The server is not fully hooked up with the game logic: i.e. it crashes if
-    * end-of-game occurs
-    * client sends illegal move
-    * client moves out of turn
-* The server doesn't give the client any feedback about things that went wrong; the client just gets kicked off in response to an illegal move, say
+* The client/server are not fully hooked up with the game logic. Examples
+    * end-of-game occurs: server sends info that game is over, but client can't start new game or receive his game states (score)
+    * client sends illegal move: server sends error and client responds by crashing
+    * client moves out-of-turn: the client code doesn't allow this, but if it did, the server would just crash
+* In the two-human game, player's who goes second isn't told that he is waiting for other player to go.
 
 ## How to run
 
