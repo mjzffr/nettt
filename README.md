@@ -20,8 +20,8 @@ What works so far:
 * If one player quits, his partner is kicked off and the session is deleted.
 
 What doesn't work yet:
-* The client/server are not fully hooked up with the game logic. Examples
-    * end-of-game occurs: server sends info that game is over, but client can't start new game or receive his game states (score)
+* The client/server are not fully hooked up with the game logic. Examples:
+    * end-of-game occurs: server sends info that game is over, but client can't start new game or receive his game stats (score)
     * client sends illegal move: server sends error and client responds by crashing
     * client moves out-of-turn: the client code doesn't allow this, but if it did, the server would just crash
 
