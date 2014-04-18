@@ -40,3 +40,9 @@ The tests are for fun.
 
 To run the tests: `py.test` from project root directory. It is assumed that the tittertactoe package is "importable" in the current virtual environment (i.e. `pip install -e .` in project root) as per these guidelines: https://pytest.org/latest/goodpractises.html#choosing-a-test-layout-import-rules 
 
+# Screenshots
+Top-left: Client playing against ai. Bottom-right: server.
+![ScreenShot 1](/screenshots/nettt1.png)
+
+Top-left: Client 1. Bottom-left: Client 2. Bottom-right: server.
+![ScreenShot 2](/screenshots/nettt2.png)
